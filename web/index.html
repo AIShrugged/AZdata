@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AZdata — e-Invoice AI</title>
+  <style>
+    :root {
+      --bg: #f6f7f9; --panel: #fff; --text: #17202a; --muted: #657282;
+      --line: #d9dee5; --brand: #1267b1; --brand-dark: #0d4f88;
+      --good: #166534; --good-bg: #dcfce7; --svc: #7c2d12;
+      --svc-bg: #ffedd5; --error: #b42318; --error-bg: #fef3f2;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font: 15px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .wrap { width: min(1080px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 48px; }
+    header { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin-bottom: 22px; }
+    h1 { margin: 0; font-size: 28px; font-weight: 720; letter-spacing: 0; }
+    .sub { margin: 3px 0 0; color: var(--muted); font-size: 14px; }
+    .tabs {
+      display: inline-flex; padding: 4px; border: 1px solid var(--line);
+      border-radius: 8px; background: var(--panel);
+    }
+    .tab {
+      border: 0; border-radius: 6px; padding: 8px 14px; background: transparent;
+      color: var(--muted); cursor: pointer; font: inherit;
+    }
+    .tab.active { background: var(--brand); color: #fff; }
+    main {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+      padding: 22px; box-shadow: 0 12px 32px rgba(20, 30, 46, .06);
+    }
+    .pane { display: none; }
+    .pane.active { display: block; }
+    form { display: grid; grid-template-columns: 1fr 180px auto; gap: 10px; align-items: center; }
+    #classify-form { grid-template-columns: 1fr auto; }
+    input, select, button { height: 42px; border-radius: 6px; font: inherit; }
+    input, select {
+      width: 100%; border: 1px solid var(--line); background: #fff;
+      color: var(--text); padding: 0 12px; outline: none;
+    }
+    input:focus, select:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(18, 103, 177, .14); }
+    button {
+      border: 1px solid var(--brand); background: var(--brand); color: #fff;
+      min-width: 92px; padding: 0 16px; cursor: pointer; font-weight: 650;
+    }
+    button:disabled { cursor: wait; opacity: .72; }
+    button:hover:not(:disabled) { background: var(--brand-dark); }
+    .output { margin-top: 20px; }
+    .meta { display: flex; flex-wrap: wrap; gap: 10px 18px; color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+    pre {
+      margin: 0 0 14px; overflow: auto; white-space: pre-wrap; border: 1px solid var(--line);
+      border-radius: 8px; background: #101828; color: #e6edf6; padding: 14px;
+      font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    .table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; min-width: 520px; background: #fff; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { background: #f1f4f8; font-size: 13px; color: #344054; }
+    tr:last-child td { border-bottom: 0; }
+    .empty { color: var(--muted); border: 1px dashed var(--line); border-radius: 8px; padding: 16px; }
+    .error { color: var(--error); background: var(--error-bg); border: 1px solid #fecdca; border-radius: 8px; padding: 12px 14px; margin-top: 16px; }
+    .card { border: 1px solid var(--line); border-radius: 8px; padding: 18px; background: #fff; }
+    .result-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 16px; }
+    .item-name { font-size: 18px; font-weight: 700; }
+    .badge {
+      display: inline-flex; align-items: center; min-height: 28px; border-radius: 999px;
+      padding: 3px 10px; font-size: 13px; font-weight: 700;
+    }
+    .badge.good { color: var(--good); background: var(--good-bg); }
+    .badge.service { color: var(--svc); background: var(--svc-bg); }
+    .facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .fact { border-top: 1px solid var(--line); padding-top: 10px; }
+    .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0; }
+    .value { margin-top: 2px; font-weight: 650; overflow-wrap: anywhere; }
+    .handled { margin-top: 14px; color: var(--muted); font-size: 13px; }
+    @media (max-width: 760px) {
+      header { display: block; } .tabs { margin-top: 16px; width: 100%; }
+      .tab { flex: 1; } form, #classify-form { grid-template-columns: 1fr; }
+      button { width: 100%; } main { padding: 16px; }
+      .facts { grid-template-columns: 1fr; } .result-head { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>AZdata — e-Invoice AI</h1>
+        <p class="sub">Natural-language invoice queries and item classification</p>
+      </div>
+      <nav class="tabs" aria-label="Views">
+        <button class="tab active" type="button" data-tab="query">NL Query</button>
+        <button class="tab" type="button" data-tab="classify">Classify item</button>
+      </nav>
+    </header>
+
+    <main>
+      <section id="query" class="pane active">
+        <form id="query-form">
+          <input id="question" required placeholder="turnover for the last 4 days for taxpayer 1234567890 / son 4 günün dövriyyəsi">
+          <select id="provider" aria-label="Provider">
+            <option value="ollama">Local (ollama)</option>
+            <option value="openrouter">OpenRouter</option>
+          </select>
+          <button id="query-button" type="submit">Run</button>
+        </form>
+        <div id="query-output" class="output"></div>
+      </section>
+
+      <section id="classify" class="pane">
+        <form id="classify-form">
+          <input id="item-text" required placeholder="Şpris 10 ml ... / Nəqliyyat xidməti">
+          <button id="classify-button" type="submit">Classify</button>
+        </form>
+        <div id="classify-output" class="output"></div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const tabs = document.querySelectorAll(".tab");
+    const panes = document.querySelectorAll(".pane");
+    const queryOutput = document.getElementById("query-output");
+    const classifyOutput = document.getElementById("classify-output");
+
+    function escapeHtml(value) {
+      return String(value == null ? "" : value).replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    }
+    function showError(target, err) {
+      const msg = err && (err.detail || err.error || err.message) ? (err.detail || err.error || err.message) : err;
+      target.innerHTML = `<div class="error">${escapeHtml(msg || "Request failed")}</div>`;
+    }
+    async function postJson(url, body) {
+      const response = await fetch(url, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw data;
+      return data;
+    }
+    function renderTable(columns, rows) {
+      if (!Array.isArray(columns) || !Array.isArray(rows) || rows.length === 0) {
+        return `<div class="empty">No rows returned.</div>`;
+      }
+      const head = columns.map(col => `<th>${escapeHtml(col)}</th>`).join("");
+      const body = rows.map(row => `<tr>${columns.map((col, i) => {
+        const value = Array.isArray(row) ? row[i] : row[col];
+        return `<td>${escapeHtml(value)}</td>`;
+      }).join("")}</tr>`).join("");
+      return `<div class="table-wrap"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+    }
+    function renderQueryResult(data) {
+      const providerModel = [data.provider, data.model].filter(Boolean).join(" / ") || "n/a";
+      queryOutput.innerHTML = `
+        <div class="meta">
+          <span>reference date: ${escapeHtml(data.reference_date || data.ref_date || "n/a")}</span>
+          <span>provider/model: ${escapeHtml(providerModel)}</span>
+        </div>
+        <pre>${escapeHtml(data.sql || "")}</pre>
+        ${renderTable(data.columns, data.rows)}
+      `;
+    }
+    function renderClassifyResult(data) {
+      const label = data.label || "Unknown";
+      const isGood = String(label).toLowerCase() === "good";
+      classifyOutput.innerHTML = `
+        <div class="card">
+          <div class="result-head">
+            <div class="item-name">${escapeHtml(data.item || document.getElementById("item-text").value)}</div>
+            <span class="badge ${isGood ? "good" : "service"}">${escapeHtml(label)}</span>
+          </div>
+          <div class="facts">
+            <div class="fact"><div class="label">Group</div><div class="value">${escapeHtml(isGood && data.group ? data.group : "n/a")}</div></div>
+            <div class="fact"><div class="label">HS code</div><div class="value">${escapeHtml(data.hs_code || "n/a")}</div></div>
+            <div class="fact"><div class="label">HS description</div><div class="value">${escapeHtml(data.hs_description || "n/a")}</div></div>
+          </div>
+          <div class="handled">handled by: ${escapeHtml(data.tier || "n/a")}</div>
+        </div>
+      `;
+    }
+    tabs.forEach(tab => tab.addEventListener("click", () => {
+      tabs.forEach(item => item.classList.toggle("active", item === tab));
+      panes.forEach(pane => pane.classList.toggle("active", pane.id === tab.dataset.tab));
+    }));
+    document.getElementById("query-form").addEventListener("submit", async event => {
+      event.preventDefault();
+      const button = document.getElementById("query-button");
+      button.disabled = true; button.textContent = "..."; queryOutput.innerHTML = "";
+      try {
+        const data = await postJson("/query", {
+          question: document.getElementById("question").value,
+          provider: document.getElementById("provider").value
+        });
+        data.error ? showError(queryOutput, data) : renderQueryResult(data);
+      } catch (err) { showError(queryOutput, err); }
+      finally { button.disabled = false; button.textContent = "Run"; }
+    });
+    document.getElementById("classify-form").addEventListener("submit", async event => {
+      event.preventDefault();
+      const button = document.getElementById("classify-button");
+      button.disabled = true; button.textContent = "..."; classifyOutput.innerHTML = "";
+      try {
+        const data = await postJson("/classify", { text: document.getElementById("item-text").value });
+        data.error ? showError(classifyOutput, data) : renderClassifyResult(data);
+      } catch (err) { showError(classifyOutput, err); }
+      finally { button.disabled = false; button.textContent = "Classify"; }
+    });
+  </script>
+</body>
+</html>
