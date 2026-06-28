@@ -3,8 +3,14 @@
 > Read this first after reopening. Goal: continue with nothing lost.
 > Last updated: 2026-06-28
 
+## ▶ DEMO — start here
+**To run the demo:** `~/Dev/AZdata/scripts/run_demo.sh` → open **http://127.0.0.1:8642/**.
+The app has **4 tabs** (NL Query · Classify item · Evals · Report); every input has **one-click example chips**. Full walkthrough + talking points in **`docs/DEMO.md`**.
+Re-run all checks: `OPENROUTER_API_KEY=$(cat ~/.config/azdata/openrouter.key) /tmp/azx/bin/python scripts/demo_test.py` (16 checks — all pass). "How it was done" = the **Report** tab + `docs/SOLUTION_REPORT.md`.
+*The launcher verifies prereqs: Postgres `azdata`, Ollama + `bge-m3`, OpenRouter key at `~/.config/azdata/openrouter.key`.*
+
 ## Where we are
-**Phase 1 (Task 1) — ✅ COMPLETE** (NL→SQL engine + catalog + FastAPI; Scenario 1 EN+AZ; guard blocks writes/DDL). **Phase 2 (Task 2) — backend ✅ COMPLETE:** Good/Service + 7-group classifier hits **99.0% fully / 99.4% label on the held-out 1298-item test** (local `qwen3.5-35b-a3b` + BGE-M3 RAG k=16 + agentic prompt-opt; `122b`+RAG = 99.31%); **EQM HS-code** assignment (LLM-first heading → registry filter → rerank; medical items → correct 9018 codes); **two-tier router** + full pipeline working. **Next: classification API (`/classify`) + Phase 3 web app.**
+**Phase 1 (Task 1) — ✅ COMPLETE** (NL→SQL engine + catalog + FastAPI; Scenario 1 EN+AZ; guard blocks writes/DDL). **Phase 2 (Task 2) — backend ✅ COMPLETE:** Good/Service + 7-group classifier hits **99.0% fully / 99.4% label on the held-out 1298-item test** (local `qwen3.5-35b-a3b` + BGE-M3 RAG k=16 + agentic prompt-opt; `122b`+RAG = 99.31%); **EQM HS-code** assignment (LLM-first heading → registry filter → rerank; medical items → correct 9018 codes); **two-tier router** + full pipeline working. **Product ✅ COMPLETE & demo-ready:** unified FastAPI (`/query` `/classify` `/evals`) + 4-tab web app (NL Query · Classify · Evals · Report) on **:8642**, with a demo launcher (`scripts/run_demo.sh`), guide (`docs/DEMO.md`), and a 16-check e2e suite (`scripts/demo_test.py`, all pass). **Remaining: Phase 4 packaging polish / optional Neon deploy.**
 
 ## Key locations
 - **Repo (cwd):** `~/Dev/AZdata` on branch **`main`**. *(The `nettle-fragment` build branch + worktree were merged into `main` and dropped on 2026-06-28 — all code + docs now live on `main`.)*

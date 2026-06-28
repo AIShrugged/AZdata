@@ -3,6 +3,12 @@
 All notable decisions and changes. Newest first. Dates absolute.
 
 ## 2026-06-28
+### Built (Product & demo)
+- **Unified API + web app:** `src/api.py` serves `/query` (Task 1), `/classify` (Task 2 full pipeline), `/evals`, `/catalog`, `/health`, and the `web/` UI. `web/index.html` — **4 tabs** (NL Query, Classify, Evals, Report) with one-click example chips, a Copy-SQL button, and an SVG model-comparison chart. Dedicated port **8642** (8000=gemhunter, 8137=Agentic-OS are other projects on the machine).
+- **In-app report:** `docs/SOLUTION_REPORT.md` + `web/report.html` (Report tab) — architecture, methods, results, and how results are presented. `scripts/build_eval_summary.py` → `data/processed/eval_summary.json` feeds the Evals dashboard.
+- **Demo kit:** `scripts/run_demo.sh` (preflight checks Postgres/Ollama/bge-m3/key/indexes, then launches), `docs/DEMO.md` (5-min walkthrough + talking points).
+- **End-to-end test:** `scripts/demo_test.py` — **16 checks all pass** (Task 1 NL→SQL EN+AZ + 5 SQL-guard security checks; Task 2 classification, EQM HS-code, two-tier router).
+
 ### Built (Phase 2 — Task 2 backend COMPLETE — classifier 99%, EQM HS-codes, two-tier router)
 - **Classifier hits 99% on the held-out test.** `src/classify.py` (Good/Service + 7-group) + `src/rag.py` (BGE-M3 few-shot retrieval over the train split). Local `qwen3.5-35b-a3b` + RAG(k=16) + `scripts/optimize_prompt.py` (agentic prompt-opt, 122B optimizer rewriting instructions from dev errors) = **99.0% fully / 99.4% label** on the full 1298-item held-out test; `qwen3.5-122b-a10b`+RAG = **99.31%**. RAG lifted the deployable 35B from ~85% → 98.9% (+14 pts); the prompt-opt loop closed the rest. Baselines: 9.7B no-RAG 60.8%, gpt-5.5 (batched) 98.2%.
 - `src/eqm.py`: EQM HS-code assignment — **LLM-first** (predict HS heading → filter the 9957-code registry to that heading → rerank). Fixes the product↔HS semantic gap that pure embedding retrieval couldn't: şpris→9018.31, kateter→9018.39.
