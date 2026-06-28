@@ -1,0 +1,150 @@
+{
+  "task2": {
+    "headline": "A 24 GB local model reaches 99% — fully private, with cloud as an optional escalation tier.",
+    "test_set": "held-out test, 1298 items (train/dev/test = 6050/1295/1298, stratified)",
+    "models": [
+      {
+        "name": "qwen3.5 9.7B",
+        "where": "local",
+        "config": "no retrieval",
+        "label": 74.1,
+        "group": 48.4,
+        "fully": 60.8,
+        "note": "baseline (166-item sample)"
+      },
+      {
+        "name": "qwen3.5 35B",
+        "where": "local",
+        "config": "+ RAG (k=16)",
+        "label": 99.08,
+        "group": 99.18,
+        "fully": 98.92,
+        "note": "held-out 1298"
+      },
+      {
+        "name": "qwen3.5 35B",
+        "where": "local",
+        "config": "+ RAG + prompt-opt",
+        "label": 99.38,
+        "group": 99.39,
+        "fully": 99.0,
+        "note": "held-out 1298 — BEST LOCAL",
+        "best_local": true
+      },
+      {
+        "name": "qwen3.5 122B",
+        "where": "cloud/API",
+        "config": "+ RAG (k=16)",
+        "label": 99.46,
+        "group": 99.39,
+        "fully": 99.31,
+        "note": "held-out 1298"
+      },
+      {
+        "name": "gpt-5.5",
+        "where": "cloud",
+        "config": "batched",
+        "label": 98.2,
+        "group": 97.6,
+        "fully": 98.2,
+        "note": "166-item sample"
+      }
+    ],
+    "journey": [
+      {
+        "stage": "35B, no retrieval",
+        "fully": 85.0
+      },
+      {
+        "stage": "+ RAG (few-shot)",
+        "fully": 98.92
+      },
+      {
+        "stage": "+ agentic prompt-opt",
+        "fully": 99.0
+      }
+    ],
+    "best_local_per_group": {
+      "BAKERY": 99,
+      "CANNED FISH": 99,
+      "WIPES": 100,
+      "MED.SYRINGES": 100,
+      "TOWELS": 100,
+      "PUBLIC UTILITIES WATER": 100,
+      "DENTAL MEDICINE": 0
+    },
+    "best_local_confusion": {
+      "Good→Good": 976,
+      "Good→Service": 1,
+      "Service→Service": 314,
+      "Service→Good": 7
+    },
+    "misclassified": [
+      {
+        "text": "SW.BUTON KG",
+        "true": "Good/BAKERY",
+        "pred": "Good/-"
+      },
+      {
+        "text": "K.Metodika və Pedaqogika Vəsait (TAİM)(2024)",
+        "true": "Good/BAKERY",
+        "pred": "Good/-"
+      },
+      {
+        "text": "B Frikadelki ovoş.qarn.v tom.sos.230 gr 48 6600",
+        "true": "Good/CANNED FISH",
+        "pred": "Good/BAKERY"
+      },
+      {
+        "text": "raqalioki",
+        "true": "Good/BAKERY",
+        "pred": "Service/-"
+      },
+      {
+        "text": "Hİ BULK ağ kağız , 70x100sm , 320qr - 340HB320",
+        "true": "Good/BAKERY",
+        "pred": "Good/WIPES"
+      },
+      {
+        "text": "Luber oil",
+        "true": "Good/DENTAL MEDICINE",
+        "pred": "Good/-"
+      },
+      {
+        "text": "\"Elektrik qızıdırıcısıGücü 2200WNöv-KonvektorGücün tənzimlənməsi-VarRəngi -ağSahə həcmi, -22m2-Nəmdən müdafiə-IPX4Divarda (eyni zamanda döşəmə  üçün)Ölçü-73x43sm\"",
+        "true": "Service/-",
+        "pred": "Good/-"
+      },
+      {
+        "text": "\"Elektrik qızıdırıcısıGücü 2200WNöv-Konvektor Gücün tənzimlənməsi Rəngi -ağ",
+        "true": "Service/-",
+        "pred": "Good/-"
+      },
+      {
+        "text": "Elektrik alətlər dəsti (təmir)",
+        "true": "Service/-",
+        "pred": "Good/-"
+      },
+      {
+        "text": "Beton bort daşları",
+        "true": "Service/-",
+        "pred": "Good/-"
+      },
+      {
+        "text": "Təlim iştirakçiları üçün: yemək (26 nəf,x4 günx18 azn)",
+        "true": "Service/-",
+        "pred": "Good/BAKERY"
+      },
+      {
+        "text": "BEKOLODER KAT 428    07 avqust -07 sentyabr kimi",
+        "true": "Service/-",
+        "pred": "Good/MED.SYRINGES"
+      }
+    ],
+    "method": "RAG retrieves the k most-similar solved items as few-shot; an agentic loop (122B optimizer) rewrites the classifier instruction from dev errors; a two-tier router escalates only low-confidence items to the cloud."
+  },
+  "task1": {
+    "scenario1": "‘turnover for the last 4 days, taxpayer 1234567890’ → 96000.00 (per-day 25000/18000/31000/22000), verified in EN + AZ against psql.",
+    "guard": "Every generated query passes a sqlglot guard (single read-only SELECT, table/column whitelist, forced LIMIT) + runs in a read-only Postgres session."
+  }
+}

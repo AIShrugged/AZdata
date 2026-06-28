@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -121,6 +122,14 @@ def classify(req: ClassifyRequest) -> Any:
         )
     except Exception as exc:
         return JSONResponse(status_code=400, content={"error": str(exc)})
+
+
+@app.get("/evals")
+def evals() -> Any:
+    fp = ROOT / "data/processed/eval_summary.json"
+    if not fp.exists():
+        raise HTTPException(status_code=404, detail="eval summary not built — run scripts/build_eval_summary.py")
+    return json.loads(fp.read_text(encoding="utf-8"))
 
 
 if (ROOT / "web").is_dir():

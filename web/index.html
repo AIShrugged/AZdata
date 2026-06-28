@@ -5,212 +5,273 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AZdata — e-Invoice AI</title>
   <style>
-    :root {
-      --bg: #f6f7f9; --panel: #fff; --text: #17202a; --muted: #657282;
-      --line: #d9dee5; --brand: #1267b1; --brand-dark: #0d4f88;
-      --good: #166534; --good-bg: #dcfce7; --svc: #7c2d12;
-      --svc-bg: #ffedd5; --error: #b42318; --error-bg: #fef3f2;
+    :root{
+      --bg:#f7f8fb;--panel:#fff;--text:#182230;--muted:#667085;--line:#d9e0ea;
+      --soft:#f1f5f9;--brand:#175cd3;--brand2:#1249a8;--green:#067647;
+      --green-bg:#ecfdf3;--blue:#155eef;--blue-bg:#eff4ff;--amber:#b54708;
+      --amber-bg:#fffaeb;--red:#b42318;--red-bg:#fef3f2
     }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0; background: var(--bg); color: var(--text);
-      font: 15px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    *{box-sizing:border-box}
+    body{
+      margin:0;background:var(--bg);color:var(--text);
+      font:15px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif
     }
-    .wrap { width: min(1080px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 48px; }
-    header { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin-bottom: 22px; }
-    h1 { margin: 0; font-size: 28px; font-weight: 720; letter-spacing: 0; }
-    .sub { margin: 3px 0 0; color: var(--muted); font-size: 14px; }
-    .tabs {
-      display: inline-flex; padding: 4px; border: 1px solid var(--line);
-      border-radius: 8px; background: var(--panel);
+    .wrap{width:min(960px,calc(100% - 32px));margin:0 auto;padding:30px 0 52px}
+    header{display:grid;gap:18px;margin-bottom:18px}
+    .top{display:flex;align-items:flex-end;justify-content:space-between;gap:18px}
+    h1{margin:0;font-size:28px;line-height:1.15;font-weight:760;letter-spacing:0}
+    .sub{margin:5px 0 0;color:var(--muted);font-size:14px}
+    .status{min-height:26px;display:inline-flex;align-items:center;gap:8px;color:var(--muted);font-size:13px}
+    .dot{font-size:16px;line-height:1}.ok{color:var(--green)}.bad{color:var(--red)}
+    .tabs{
+      display:flex;gap:4px;padding:4px;border:1px solid var(--line);border-radius:8px;
+      background:var(--panel);box-shadow:0 1px 2px rgba(16,24,40,.04)
     }
-    .tab {
-      border: 0; border-radius: 6px; padding: 8px 14px; background: transparent;
-      color: var(--muted); cursor: pointer; font: inherit;
+    .tab{
+      min-height:38px;border:0;border-radius:6px;padding:0 14px;background:transparent;
+      color:#475467;cursor:pointer;font:inherit;font-weight:650
     }
-    .tab.active { background: var(--brand); color: #fff; }
-    main {
-      background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
-      padding: 22px; box-shadow: 0 12px 32px rgba(20, 30, 46, .06);
+    .tab.active{background:var(--brand);color:#fff}
+    main{
+      border:1px solid var(--line);border-radius:10px;background:var(--panel);
+      box-shadow:0 16px 40px rgba(16,24,40,.08);padding:22px
     }
-    .pane { display: none; }
-    .pane.active { display: block; }
-    form { display: grid; grid-template-columns: 1fr 180px auto; gap: 10px; align-items: center; }
-    #classify-form { grid-template-columns: 1fr auto; }
-    input, select, button { height: 42px; border-radius: 6px; font: inherit; }
-    input, select {
-      width: 100%; border: 1px solid var(--line); background: #fff;
-      color: var(--text); padding: 0 12px; outline: none;
+    .pane{display:none}.pane.active{display:block}
+    form{display:grid;grid-template-columns:1fr 180px auto;gap:10px;align-items:center}
+    #classify-form{grid-template-columns:1fr auto}
+    input,select,button{min-height:42px;border-radius:7px;font:inherit}
+    input,select{width:100%;border:1px solid var(--line);background:#fff;color:var(--text);padding:0 12px;outline:none}
+    input:focus,select:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(23,92,211,.14)}
+    button{border:1px solid var(--brand);background:var(--brand);color:#fff;min-width:92px;padding:0 16px;cursor:pointer;font-weight:700}
+    button:hover:not(:disabled){background:var(--brand2)}button:disabled{cursor:wait;opacity:.72}
+    .ghost{border-color:var(--line);background:#fff;color:#344054;min-width:0}
+    .ghost:hover:not(:disabled){background:var(--soft);border-color:#cbd5e1}
+    .output{margin-top:20px}.muted{color:var(--muted)}.small{font-size:13px}
+    .error{margin-top:16px;border:1px solid #fecdca;border-radius:8px;background:var(--red-bg);color:var(--red);padding:12px 14px;font-weight:620}
+    .label{margin:0 0 7px;color:#344054;font-size:13px;font-weight:720}
+    pre{
+      margin:0 0 14px;overflow:auto;white-space:pre-wrap;border:1px solid #263445;
+      border-radius:8px;background:#101828;color:#edf4ff;padding:14px;
+      font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace
     }
-    input:focus, select:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(18, 103, 177, .14); }
-    button {
-      border: 1px solid var(--brand); background: var(--brand); color: #fff;
-      min-width: 92px; padding: 0 16px; cursor: pointer; font-weight: 650;
-    }
-    button:disabled { cursor: wait; opacity: .72; }
-    button:hover:not(:disabled) { background: var(--brand-dark); }
-    .output { margin-top: 20px; }
-    .meta { display: flex; flex-wrap: wrap; gap: 10px 18px; color: var(--muted); font-size: 13px; margin-bottom: 12px; }
-    pre {
-      margin: 0 0 14px; overflow: auto; white-space: pre-wrap; border: 1px solid var(--line);
-      border-radius: 8px; background: #101828; color: #e6edf6; padding: 14px;
-      font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    }
-    .table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
-    table { width: 100%; border-collapse: collapse; min-width: 520px; background: #fff; }
-    th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
-    th { background: #f1f4f8; font-size: 13px; color: #344054; }
-    tr:last-child td { border-bottom: 0; }
-    .empty { color: var(--muted); border: 1px dashed var(--line); border-radius: 8px; padding: 16px; }
-    .error { color: var(--error); background: var(--error-bg); border: 1px solid #fecdca; border-radius: 8px; padding: 12px 14px; margin-top: 16px; }
-    .card { border: 1px solid var(--line); border-radius: 8px; padding: 18px; background: #fff; }
-    .result-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 16px; }
-    .item-name { font-size: 18px; font-weight: 700; }
-    .badge {
-      display: inline-flex; align-items: center; min-height: 28px; border-radius: 999px;
-      padding: 3px 10px; font-size: 13px; font-weight: 700;
-    }
-    .badge.good { color: var(--good); background: var(--good-bg); }
-    .badge.service { color: var(--svc); background: var(--svc-bg); }
-    .facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-    .fact { border-top: 1px solid var(--line); padding-top: 10px; }
-    .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0; }
-    .value { margin-top: 2px; font-weight: 650; overflow-wrap: anywhere; }
-    .handled { margin-top: 14px; color: var(--muted); font-size: 13px; }
-    @media (max-width: 760px) {
-      header { display: block; } .tabs { margin-top: 16px; width: 100%; }
-      .tab { flex: 1; } form, #classify-form { grid-template-columns: 1fr; }
-      button { width: 100%; } main { padding: 16px; }
-      .facts { grid-template-columns: 1fr; } .result-head { align-items: flex-start; flex-direction: column; }
+    .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:8px;background:#fff}
+    table{width:100%;min-width:560px;border-collapse:collapse}
+    th,td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+    th{background:#f3f6fa;color:#344054;font-size:13px;font-weight:760}
+    tr:last-child td{border-bottom:0}.num{text-align:right;font-variant-numeric:tabular-nums}
+    .best-row{background:var(--green-bg)}.caption{margin-top:10px;color:var(--muted);font-size:13px}
+    .empty{border:1px dashed var(--line);border-radius:8px;color:var(--muted);padding:16px}
+    .card{border:1px solid var(--line);border-radius:8px;background:#fff;padding:18px}
+    .badge{display:inline-flex;align-items:center;min-height:34px;border-radius:999px;padding:4px 13px;font-weight:800;letter-spacing:.02em}
+    .badge.good{background:var(--green-bg);color:var(--green)}.badge.service{background:var(--blue-bg);color:var(--blue)}
+    .tag{border-radius:999px;padding:2px 8px;font-size:12px;font-weight:740}
+    .tag.local{background:var(--green-bg);color:var(--green)}.tag.cloud{background:var(--amber-bg);color:var(--amber)}
+    .result-card{display:grid;gap:14px}.facts{display:grid;gap:8px;color:#344054}
+    .hs-desc{display:block;margin-top:3px;color:var(--muted);font-size:13px;font-weight:400}
+    .footer{display:flex;flex-wrap:wrap;align-items:center;gap:8px;border-top:1px solid var(--line);padding-top:12px;color:var(--muted);font-size:13px}
+    .eval-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
+    .section{border-top:1px solid var(--line);padding-top:18px;margin-top:18px}
+    .section:first-of-type{border-top:0;padding-top:0;margin-top:0}
+    h2,h3{margin:0;letter-spacing:0}h2{font-size:22px;line-height:1.25}h3{font-size:16px;margin-bottom:10px}
+    .bar-list{display:grid;gap:10px}.bar-row{display:grid;gap:5px}
+    .bar-label{display:flex;justify-content:space-between;gap:12px;color:#344054;font-size:13px}
+    .track{overflow:hidden;height:12px;border-radius:999px;background:#edf2f7}
+    .fill{height:100%;border-radius:inherit;background:var(--brand)}.fill.good{background:var(--green)}.fill.low{background:var(--red)}
+    .confusion{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;max-width:520px}
+    .cell{border:1px solid var(--line);border-radius:8px;padding:12px;background:#fff}
+    .cell strong{display:block;font-size:22px;line-height:1.1;margin-top:4px}
+    .truncate{max-width:410px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    @media (max-width:760px){
+      .top{display:grid}.tabs{width:100%}.tab{flex:1;padding:0 8px}main{padding:16px}
+      form,#classify-form{grid-template-columns:1fr}button{width:100%}
+      .eval-head{align-items:stretch;flex-direction:column}.confusion{grid-template-columns:1fr}.truncate{max-width:260px}
     }
   </style>
 </head>
 <body>
   <div class="wrap">
     <header>
-      <div>
-        <h1>AZdata — e-Invoice AI</h1>
-        <p class="sub">Natural-language invoice queries and item classification</p>
+      <div class="top">
+        <div>
+          <h1>AZdata — e-Invoice AI</h1>
+          <p class="sub">Azerbaijani e-invoice AI — NL→SQL + item classification</p>
+        </div>
+        <div id="status" class="status">checking status...</div>
       </div>
-      <nav class="tabs" aria-label="Views">
+      <nav class="tabs" aria-label="Sections">
         <button class="tab active" type="button" data-tab="query">NL Query</button>
         <button class="tab" type="button" data-tab="classify">Classify item</button>
+        <button class="tab" type="button" data-tab="evals">Evals</button>
       </nav>
     </header>
-
     <main>
       <section id="query" class="pane active">
         <form id="query-form">
-          <input id="question" required placeholder="turnover for the last 4 days for taxpayer 1234567890 / son 4 günün dövriyyəsi">
+          <input id="question" required placeholder="turnover for the last 4 days for taxpayer 1234567890   ·   son 4 günün dövriyyəsi">
           <select id="provider" aria-label="Provider">
-            <option value="ollama">Local (ollama)</option>
-            <option value="openrouter">OpenRouter</option>
+            <option value="ollama">Local (Ollama)</option>
+            <option value="openrouter">OpenRouter (cloud)</option>
           </select>
           <button id="query-button" type="submit">Run</button>
         </form>
         <div id="query-output" class="output"></div>
       </section>
-
       <section id="classify" class="pane">
         <form id="classify-form">
-          <input id="item-text" required placeholder="Şpris 10 ml ... / Nəqliyyat xidməti">
+          <input id="item-text" required placeholder="Şpris 10 ml … · Nəqliyyat xidməti">
           <button id="classify-button" type="submit">Classify</button>
         </form>
         <div id="classify-output" class="output"></div>
       </section>
+      <section id="evals" class="pane">
+        <div class="eval-head">
+          <div><h2>Evals</h2><p class="sub">Read-only summary from <code>/evals</code></p></div>
+          <button id="evals-refresh" class="ghost" type="button">Refresh</button>
+        </div>
+        <div id="evals-output" class="output"></div>
+      </section>
     </main>
   </div>
-
   <script>
-    const tabs = document.querySelectorAll(".tab");
-    const panes = document.querySelectorAll(".pane");
-    const queryOutput = document.getElementById("query-output");
-    const classifyOutput = document.getElementById("classify-output");
+    const $=id=>document.getElementById(id);
+    const statusEl=$("status"),queryOutput=$("query-output"),classifyOutput=$("classify-output"),evalsOutput=$("evals-output");
+    let evalsLoaded=false;
 
-    function escapeHtml(value) {
-      return String(value == null ? "" : value).replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;").replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    function escapeHTML(value){
+      return String(value==null?"":value).replace(/&/g,"&amp;").replace(/</g,"&lt;")
+        .replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
     }
-    function showError(target, err) {
-      const msg = err && (err.detail || err.error || err.message) ? (err.detail || err.error || err.message) : err;
-      target.innerHTML = `<div class="error">${escapeHtml(msg || "Request failed")}</div>`;
-    }
-    async function postJson(url, body) {
-      const response = await fetch(url, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw data;
+    function pct(value){const n=Number(value);return Number.isFinite(n)?String(Math.round(n*100)/100):"0"}
+    function widthPct(value){const n=Number(value);return Number.isFinite(n)?Math.max(0,Math.min(100,n)):0}
+    function errorMessage(err){return err&&(err.error||err.detail||err.message)||String(err||"Request failed")}
+    function showError(target,err){target.innerHTML=`<div class="error">${escapeHTML(errorMessage(err))}</div>`}
+
+    async function postJSON(path,body){
+      const response=await fetch(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+      const data=await response.json().catch(()=>({detail:response.statusText||"Request failed"}));
+      if(!response.ok) throw data;
       return data;
     }
-    function renderTable(columns, rows) {
-      if (!Array.isArray(columns) || !Array.isArray(rows) || rows.length === 0) {
-        return `<div class="empty">No rows returned.</div>`;
-      }
-      const head = columns.map(col => `<th>${escapeHtml(col)}</th>`).join("");
-      const body = rows.map(row => `<tr>${columns.map((col, i) => {
-        const value = Array.isArray(row) ? row[i] : row[col];
-        return `<td>${escapeHtml(value)}</td>`;
-      }).join("")}</tr>`).join("");
+    async function getJSON(path){
+      const response=await fetch(path);
+      const data=await response.json().catch(()=>({detail:response.statusText||"Request failed"}));
+      if(!response.ok){data.status=response.status;throw data}
+      return data;
+    }
+    async function withButton(button,busy,fn){
+      const old=button.textContent;button.disabled=true;button.textContent=busy;
+      try{return await fn()}finally{button.disabled=false;button.textContent=old}
+    }
+
+    function renderTable(columns,rows){
+      if(!Array.isArray(columns)||!Array.isArray(rows)||!rows.length)return `<div class="empty">No rows returned.</div>`;
+      const head=columns.map(col=>`<th>${escapeHTML(col)}</th>`).join("");
+      const body=rows.map(row=>`<tr>${columns.map((col,i)=>`<td>${escapeHTML(Array.isArray(row)?row[i]:row[col])}</td>`).join("")}</tr>`).join("");
       return `<div class="table-wrap"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
     }
-    function renderQueryResult(data) {
-      const providerModel = [data.provider, data.model].filter(Boolean).join(" / ") || "n/a";
-      queryOutput.innerHTML = `
-        <div class="meta">
-          <span>reference date: ${escapeHtml(data.reference_date || data.ref_date || "n/a")}</span>
-          <span>provider/model: ${escapeHtml(providerModel)}</span>
-        </div>
-        <pre>${escapeHtml(data.sql || "")}</pre>
-        ${renderTable(data.columns, data.rows)}
-      `;
+    function renderQueryResult(data){
+      const result=data.result||data;
+      const providerModel=[data.provider||result.provider,data.model||result.model].filter(Boolean).join("/");
+      const referenceDate=data.reference_date||result.reference_date||"reference_date";
+      queryOutput.innerHTML=`
+        <p class="label">Generated SQL</p>
+        <pre><code>${escapeHTML(data.sql||result.sql||"")}</code></pre>
+        ${renderTable(result.columns,result.rows)}
+        <div class="caption">${escapeHTML(providerModel||"provider/model")} · ${escapeHTML(referenceDate)}</div>`;
     }
-    function renderClassifyResult(data) {
-      const label = data.label || "Unknown";
-      const isGood = String(label).toLowerCase() === "good";
-      classifyOutput.innerHTML = `
-        <div class="card">
-          <div class="result-head">
-            <div class="item-name">${escapeHtml(data.item || document.getElementById("item-text").value)}</div>
-            <span class="badge ${isGood ? "good" : "service"}">${escapeHtml(label)}</span>
-          </div>
+    function renderClassifyResult(data){
+      const label=String(data.label||"").toUpperCase(),isGood=label==="GOOD",tier=String(data.tier||"unknown");
+      const cloud=/strong|cloud/i.test(tier),conf=Number(data.confidence),escalated=data.escalated?" · escalated":"";
+      classifyOutput.innerHTML=`
+        <div class="card result-card">
+          <div><span class="badge ${isGood?"good":"service"}">${escapeHTML(label||"UNKNOWN")}</span></div>
           <div class="facts">
-            <div class="fact"><div class="label">Group</div><div class="value">${escapeHtml(isGood && data.group ? data.group : "n/a")}</div></div>
-            <div class="fact"><div class="label">HS code</div><div class="value">${escapeHtml(data.hs_code || "n/a")}</div></div>
-            <div class="fact"><div class="label">HS description</div><div class="value">${escapeHtml(data.hs_description || "n/a")}</div></div>
+            ${data.group?`<div><strong>Group:</strong> ${escapeHTML(data.group)}</div>`:""}
+            ${data.hs_code?`<div><strong>HS code:</strong> ${escapeHTML(data.hs_code)}<span class="hs-desc">${escapeHTML(data.hs_description||"")}</span></div>`:""}
           </div>
-          <div class="handled">handled by: ${escapeHtml(data.tier || "n/a")}</div>
-        </div>
-      `;
+          <div class="footer">
+            <span>handled by:</span><span class="tag ${cloud?"cloud":"local"}">${escapeHTML(tier)}</span>
+            <span>confidence: ${escapeHTML(Number.isFinite(conf)?conf.toFixed(2):"n/a")}${escapeHTML(escalated)}</span>
+          </div>
+        </div>`;
     }
-    tabs.forEach(tab => tab.addEventListener("click", () => {
-      tabs.forEach(item => item.classList.toggle("active", item === tab));
-      panes.forEach(pane => pane.classList.toggle("active", pane.id === tab.dataset.tab));
+    function renderModels(models){
+      if(!Array.isArray(models)||!models.length)return `<div class="empty">No model results.</div>`;
+      const rows=models.map(m=>`
+        <tr class="${m.best_local?"best-row":""}">
+          <td>${escapeHTML(m.name)} ${m.best_local?`<span class="tag local">★ best local</span>`:""}</td>
+          <td>${escapeHTML(m.where)}</td><td>${escapeHTML(m.config)}</td>
+          <td class="num">${escapeHTML(pct(m.label))}%</td><td class="num">${escapeHTML(pct(m.group))}%</td>
+          <td class="num">${escapeHTML(pct(m.fully))}%</td><td>${escapeHTML(m.note)}</td>
+        </tr>`).join("");
+      return `<div class="table-wrap"><table><thead><tr><th>Model</th><th>Where</th><th>Config</th><th class="num">Label %</th><th class="num">Group %</th><th class="num">Fully %</th><th>Note</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }
+    function renderBars(items,lowRed){
+      const entries=Array.isArray(items)?items.map(i=>[i.stage,i.fully]):Object.entries(items||{});
+      if(!entries.length)return `<div class="empty">No data.</div>`;
+      return `<div class="bar-list">${entries.map(([name,value])=>{
+        const n=widthPct(value),klass=lowRed&&n<50?"low":"good";
+        return `<div class="bar-row"><div class="bar-label"><span>${escapeHTML(name)}</span><span>${escapeHTML(pct(value))}%</span></div><div class="track"><div class="fill ${klass}" style="width:${n}%"></div></div></div>`;
+      }).join("")}</div>`;
+    }
+    function renderConfusion(confusion){
+      return `<div class="confusion">${["Good→Good","Good→Service","Service→Service","Service→Good"].map(label=>`
+        <div class="cell"><span class="muted small">${escapeHTML(label)}</span><strong>${escapeHTML((confusion||{})[label]??0)}</strong></div>`).join("")}</div>`;
+    }
+    function renderMisclassified(items){
+      if(!Array.isArray(items)||!items.length)return `<div class="empty">No misclassified examples.</div>`;
+      const rows=items.map(i=>`<tr><td><div class="truncate" title="${escapeHTML(i.text)}">${escapeHTML(i.text)}</div></td><td>${escapeHTML(i.true)}</td><td>${escapeHTML(i.pred)}</td></tr>`).join("");
+      return `<div class="table-wrap"><table><thead><tr><th>Item</th><th>True</th><th>Pred</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }
+    function renderEvals(data){
+      const t2=data.task2||{},t1=data.task1||{};
+      evalsOutput.innerHTML=`
+        <section class="section"><h2>${escapeHTML(t2.headline||"Task 2 eval summary")}</h2><p class="muted">${escapeHTML(t2.test_set||"")}</p><p class="muted small">${escapeHTML(t2.method||"")}</p></section>
+        <section class="section"><h3>Model comparison</h3>${renderModels(t2.models)}</section>
+        <section class="section"><h3>The journey</h3>${renderBars(t2.journey,false)}</section>
+        <section class="section"><h3>Best local — per-group accuracy</h3>${renderBars(t2.best_local_per_group,true)}</section>
+        <section class="section"><h3>Confusion (Good/Service)</h3>${renderConfusion(t2.best_local_confusion)}</section>
+        <section class="section"><h3>Misclassified examples</h3>${renderMisclassified(t2.misclassified)}</section>
+        <section class="section"><h3>Task 1</h3><p class="muted">${escapeHTML(t1.scenario1||"")}</p><p class="muted">${escapeHTML(t1.guard||"")}</p></section>`;
+    }
+    async function loadHealth(){
+      try{
+        const data=await getJSON("/health"),ready=data.task2_ready==null?"n/a":data.task2_ready;
+        statusEl.innerHTML=`<span class="dot ok">●</span><span>ready · task2_ready: ${escapeHTML(ready)}</span>`;
+      }catch(err){statusEl.innerHTML=`<span class="dot bad">●</span><span>${escapeHTML(errorMessage(err))}</span>`}
+    }
+    async function loadEvals(button){
+      evalsOutput.innerHTML=`<div class="empty">Loading eval summary...</div>`;
+      const work=async()=>{
+        try{renderEvals(await getJSON("/evals"));evalsLoaded=true}
+        catch(err){err.status===404?evalsOutput.innerHTML=`<div class="empty">eval summary not built — run scripts/build_eval_summary.py</div>`:showError(evalsOutput,err)}
+      };
+      return button?withButton(button,"…",work):work();
+    }
+
+    document.querySelectorAll(".tab").forEach(tab=>tab.addEventListener("click",()=>{
+      document.querySelectorAll(".tab").forEach(item=>item.classList.toggle("active",item===tab));
+      document.querySelectorAll(".pane").forEach(pane=>pane.classList.toggle("active",pane.id===tab.dataset.tab));
+      if(tab.dataset.tab==="evals"&&!evalsLoaded)loadEvals();
     }));
-    document.getElementById("query-form").addEventListener("submit", async event => {
+    $("query-form").addEventListener("submit",event=>{
       event.preventDefault();
-      const button = document.getElementById("query-button");
-      button.disabled = true; button.textContent = "..."; queryOutput.innerHTML = "";
-      try {
-        const data = await postJson("/query", {
-          question: document.getElementById("question").value,
-          provider: document.getElementById("provider").value
-        });
-        data.error ? showError(queryOutput, data) : renderQueryResult(data);
-      } catch (err) { showError(queryOutput, err); }
-      finally { button.disabled = false; button.textContent = "Run"; }
+      withButton($("query-button"),"…",async()=>{
+        queryOutput.innerHTML="";
+        try{renderQueryResult(await postJSON("/query",{question:$("question").value,provider:$("provider").value}))}
+        catch(err){showError(queryOutput,err)}
+      });
     });
-    document.getElementById("classify-form").addEventListener("submit", async event => {
+    $("classify-form").addEventListener("submit",event=>{
       event.preventDefault();
-      const button = document.getElementById("classify-button");
-      button.disabled = true; button.textContent = "..."; classifyOutput.innerHTML = "";
-      try {
-        const data = await postJson("/classify", { text: document.getElementById("item-text").value });
-        data.error ? showError(classifyOutput, data) : renderClassifyResult(data);
-      } catch (err) { showError(classifyOutput, err); }
-      finally { button.disabled = false; button.textContent = "Classify"; }
+      withButton($("classify-button"),"…",async()=>{
+        classifyOutput.innerHTML="";
+        try{renderClassifyResult(await postJSON("/classify",{text:$("item-text").value}))}
+        catch(err){showError(classifyOutput,err)}
+      });
     });
+    $("evals-refresh").addEventListener("click",event=>loadEvals(event.currentTarget));
+    loadHealth();
   </script>
 </body>
 </html>
