@@ -3,6 +3,9 @@
 All notable decisions and changes. Newest first. Dates absolute.
 
 ## 2026-06-28
+### Repo
+- Merged branch `nettle-fragment` (Task 1 implementation) into `main` and **dropped the branch + its worktree**; all code + docs now live on `main` in `~/Dev/AZdata`. `.mcp.json` (ruflo + **codex**) is now tracked on `main`, so Codex MCP tools load when launching from `~/Dev/AZdata`.
+
 ### Built (Phase 1 — Task 1 COMPLETE: ingestion → catalog → NL→SQL → API)
 - `src/api.py` (Codex-authored, Claude-tested) — **FastAPI backend** wrapping the engine: `POST /query` → {sql, rows, columns, reference_date}, `GET /health`, `GET /catalog`; CORS for the Phase-3 web app. Verified via TestClient + a live uvicorn server (port 8077): Scenario 1 → 96000 / the 4 daily rows; **guard blocks** DELETE / UPDATE / multi-statement DROP / system-catalog / hallucinated-column, allows legit SELECT (+injected LIMIT). Compat fix (Claude): venv is Python 3.9 → `from __future__ import annotations` + `Optional`/`Any` (avoid 3.10 `X | None` runtime eval).
 - `src/nlsql.py` (Codex-authored, Claude-tested + tuned) — **LLM-backed NL→SQL engine**: catalog-grounded prompt → model SQL → `sqlglot` guard (single read-only SELECT, table/column whitelist, LIMIT enforcement) → read-only `psycopg2` session execution. Providers configurable (ollama/openai/anthropic), default local **qwen3.5**. Verified on local Ollama: **Scenario 1 passes in EN + AZ** (daily turnover last 4 days, TIN 1234567890 = 25000/18000/31000/22000); real-data recipient query matches psql (28 / 59183.83). Tuning (Claude): default `think:false` for reasoning models (155s→3.5s) + configurable `AZDATA_LLM_TIMEOUT`.

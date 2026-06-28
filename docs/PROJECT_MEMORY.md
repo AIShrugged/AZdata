@@ -9,7 +9,7 @@
 ## 1. Context
 - Client deliverable: **Azerbaijani tax-authority e-invoice AI**, two tasks, presented via one web app.
 - Language of item/product text: **Azerbaijani** (some Russian possible).
-- Repo: `~/Dev/AZdata` (main). Active build runs in linked worktree `nettle-fragment`.
+- Repo: `~/Dev/AZdata` (branch `main`). *(The `nettle-fragment` build worktree was merged into `main` and dropped on 2026-06-28 — everything is on `main` now.)*
 - Data files: `~/Dev/AZdata/docs/`.
 - **Working method:** Codex (MCP) writes code; Claude designs/manages/tests.
 

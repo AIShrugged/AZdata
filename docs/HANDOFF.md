@@ -7,9 +7,9 @@
 **Phase 1 (Task 1: NL→SQL + metadata catalog) — ✅ COMPLETE.** Ingestion, metadata catalog, the LLM-backed NL→SQL engine, and the FastAPI backend are all built + verified — Scenario 1 passes in EN + AZ, the guard blocks writes/DDL, and a live uvicorn server serves `/query`. **Next: Phase 2 (Task 2 — Good vs Service classification).**
 
 ## Key locations
-- **Build worktree (cwd):** `~/.superset/worktrees/5846a0d3-f32a-4c9a-8c54-617d348faf0f/nettle-fragment` (git branch `nettle-fragment`).
+- **Repo (cwd):** `~/Dev/AZdata` on branch **`main`**. *(The `nettle-fragment` build branch + worktree were merged into `main` and dropped on 2026-06-28 — all code + docs now live on `main`.)*
 - **Durable docs:** `~/Dev/AZdata/docs/` → `ROADMAP.md`, `CHANGELOG.md`, `PROJECT_MEMORY.md`, this `HANDOFF.md`.
-- **Raw data:** `~/Dev/AZdata/docs/*.xlsx|*.xls`; copies in worktree `data/`.
+- **Raw data:** tracked in `~/Dev/AZdata/data/*.xlsx|*.xls` (also copies in `docs/`).
 - **DB:** local Postgres 16 (Homebrew, running). Database **`azdata`** — connect: `psql -d azdata`.
 - **Excel venv:** `/tmp/azx/bin/python` (pandas/openpyxl/xlrd). *Note: `/tmp` may clear on reboot — recreate with `python3 -m venv /tmp/azx && /tmp/azx/bin/pip install pandas openpyxl xlrd psycopg2-binary pyyaml sqlglot fastapi uvicorn httpx` if missing.*
 - **Internal memory:** `~/.claude/projects/-Users-frodobaggins-Dev-AZdata/memory/`.
@@ -23,7 +23,7 @@
 - Codex registered as MCP server (`codex mcp-server`) in `.mcp.json`; logged in via ChatGPT.
 
 ## FIRST thing after reopen
-1. **Codex MCP tools** load ONLY when Claude Code is launched from the **`nettle-fragment` worktree** (its `.mcp.json` registers `codex`). From the `main` worktree (`~/Dev/AZdata`, whose `.mcp.json` has only ruflo) they will NOT appear — confirmed 2026-06-28. Reliable fallback (in use): `codex exec -C <nettle-fragment> "<spec>"` (CLI authenticated). `ToolSearch("codex")` to check.
+1. **Codex MCP tools**: `.mcp.json` on `main` (`~/Dev/AZdata`) now registers `codex` (+ ruflo). Launching Claude Code from `~/Dev/AZdata` should load `mcp__codex__*` after a restart — check via `ToolSearch("codex")`. Reliable fallback either way: `codex exec -C ~/Dev/AZdata "<spec>"` (CLI authenticated).
 2. Quick sanity: `psql -d azdata -c '\dt'` should list `einvoice`, `taxpayer`.
 
 ## Next steps (Phase 1 remaining) — Codex implements, Claude tests
