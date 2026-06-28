@@ -7,12 +7,12 @@
   <style>
     :root {
       color-scheme: light;
+      --body: #f7f8fb;
+      --panel: #fff;
       --text: #182230;
       --muted: #667085;
       --brand: #175cd3;
       --border: #d9e0ea;
-      --panel: #fff;
-      --body: #f7f8fb;
       --table-head: #f3f6fa;
       --best: #ecfdf3;
       --code-bg: #101828;
@@ -23,70 +23,58 @@
       box-sizing: border-box;
     }
 
-    html {
-      background: var(--body);
-    }
-
     body {
       margin: 0;
       padding: 28px;
       background: var(--body);
       color: var(--text);
       font-family:
-        -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
-        Cantarell, "Helvetica Neue", Arial, sans-serif;
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        Roboto,
+        "Helvetica Neue",
+        Arial,
+        sans-serif;
       font-size: 16px;
-      line-height: 1.7;
-      text-rendering: optimizeLegibility;
+      line-height: 1.68;
     }
 
     main {
       max-width: 860px;
       margin: 0 auto;
-      padding: 42px 44px 48px;
+      padding: 44px 48px 56px;
       background: var(--panel);
       border: 1px solid var(--border);
-      border-radius: 14px;
-      box-shadow: 0 16px 40px rgba(16, 24, 40, 0.07);
-    }
-
-    header {
-      padding-bottom: 24px;
-      border-bottom: 1px solid var(--border);
-      margin-bottom: 34px;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(16, 24, 40, 0.05);
     }
 
     h1,
     h2,
     h3 {
       color: var(--text);
-      line-height: 1.24;
+      line-height: 1.22;
       letter-spacing: 0;
     }
 
     h1 {
-      margin: 0 0 10px;
-      font-size: clamp(2rem, 4vw, 3rem);
+      margin: 0 0 8px;
+      font-size: 2.55rem;
       font-weight: 760;
     }
 
     h2 {
-      margin: 42px 0 14px;
-      padding-top: 4px;
-      font-size: 1.45rem;
+      margin: 42px 0 16px;
+      padding-top: 30px;
+      border-top: 1px solid var(--border);
+      font-size: 1.46rem;
       font-weight: 720;
     }
 
-    h2 + p,
-    h2 + pre,
-    h2 + ul,
-    h2 + ol {
-      margin-top: 0;
-    }
-
     h3 {
-      margin: 28px 0 10px;
-      font-size: 1.1rem;
+      margin: 28px 0 12px;
+      font-size: 1.08rem;
       font-weight: 700;
     }
 
@@ -95,90 +83,100 @@
     }
 
     .subtitle {
-      margin: 0;
+      margin: 0 0 28px;
       color: var(--muted);
-      font-size: 1.08rem;
-      font-style: italic;
+      font-size: 1.04rem;
     }
 
-    section {
-      padding-top: 2px;
+    .rule {
+      height: 1px;
+      margin: 30px 0 8px;
+      background: var(--border);
     }
 
-    section + section {
-      border-top: 1px solid rgba(217, 224, 234, 0.75);
-      margin-top: 34px;
+    a {
+      color: var(--brand);
     }
 
     strong {
-      font-weight: 700;
-      color: #111827;
-    }
-
-    em {
-      color: inherit;
+      font-weight: 720;
     }
 
     ul,
     ol {
-      margin: 0 0 20px 1.35rem;
-      padding: 0;
+      margin: 0 0 22px;
+      padding-left: 1.35rem;
     }
 
     li {
       margin: 8px 0;
-      padding-left: 0.15rem;
+      padding-left: 2px;
+    }
+
+    blockquote {
+      margin: 22px 0;
+      padding: 16px 18px;
+      color: #344054;
+      background: #f8fafc;
+      border-left: 4px solid var(--brand);
+      border-radius: 8px;
+    }
+
+    blockquote p {
+      margin: 0;
     }
 
     code {
-      padding: 0.14rem 0.34rem;
-      border: 1px solid rgba(217, 224, 234, 0.9);
+      padding: 0.13rem 0.34rem;
+      color: #0f3f9a;
+      background: #eef4ff;
+      border: 1px solid #d5e3ff;
       border-radius: 5px;
-      background: #f3f6fa;
-      color: #0f172a;
       font-family:
-        ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-        "Liberation Mono", "Courier New", monospace;
-      font-size: 0.92em;
+        ui-monospace,
+        SFMono-Regular,
+        Menlo,
+        Monaco,
+        Consolas,
+        "Liberation Mono",
+        "Courier New",
+        monospace;
+      font-size: 0.91em;
     }
 
     pre {
-      margin: 18px 0 24px;
-      padding: 20px 22px;
+      margin: 20px 0 24px;
+      padding: 18px 20px;
       overflow-x: auto;
-      border-radius: 10px;
-      background: var(--code-bg);
       color: var(--code-text);
-      font-family:
-        ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-        "Liberation Mono", "Courier New", monospace;
-      font-size: 0.92rem;
-      line-height: 1.55;
-      white-space: pre;
+      background: var(--code-bg);
+      border-radius: 10px;
+      line-height: 1.48;
       tab-size: 2;
+      -webkit-overflow-scrolling: touch;
     }
 
     pre code {
       display: block;
       padding: 0;
+      color: inherit;
+      background: transparent;
       border: 0;
       border-radius: 0;
-      background: transparent;
-      color: inherit;
-      font: inherit;
-      white-space: inherit;
+      font-size: 0.9rem;
+      white-space: pre;
     }
 
     .table-wrap {
-      margin: 18px 0 20px;
+      margin: 22px 0 18px;
       overflow-x: auto;
       border: 1px solid var(--border);
       border-radius: 10px;
-      background: var(--panel);
     }
 
     table {
       width: 100%;
+      min-width: 720px;
       border-collapse: collapse;
       font-variant-numeric: tabular-nums;
     }
@@ -195,12 +193,7 @@
       background: var(--table-head);
       color: #344054;
       font-size: 0.88rem;
-      font-weight: 700;
-      white-space: nowrap;
-    }
-
-    td {
-      font-size: 0.95rem;
+      font-weight: 720;
     }
 
     tr:last-child td {
@@ -221,34 +214,24 @@
       background: var(--best);
     }
 
-    a {
-      color: var(--brand);
-      text-decoration-thickness: 0.08em;
-      text-underline-offset: 0.18em;
-    }
-
-    @media (max-width: 700px) {
+    @media (max-width: 720px) {
       body {
         padding: 18px;
         font-size: 15px;
       }
 
       main {
-        padding: 30px 22px 34px;
+        padding: 30px 22px 38px;
         border-radius: 10px;
       }
 
-      header {
-        margin-bottom: 26px;
+      h1 {
+        font-size: 2rem;
       }
 
       h2 {
-        margin-top: 34px;
-      }
-
-      th,
-      td {
-        padding: 10px 12px;
+        margin-top: 36px;
+        padding-top: 24px;
       }
     }
   </style>
@@ -257,8 +240,10 @@
   <main>
     <header>
       <h1>AZdata — e-Invoice AI · Solution Report</h1>
-      <p class="subtitle">How the two tasks were solved, and how the results are presented.</p>
+      <p class="subtitle"><em>How the two tasks were solved, and how the results are presented.</em></p>
     </header>
+
+    <div class="rule" aria-hidden="true"></div>
 
     <section aria-labelledby="what-was-built">
       <h2 id="what-was-built">1. What was built</h2>
@@ -298,7 +283,10 @@ Postgres (einvoice, taxpayer)   BGE-M3 vector indexes
 
     <section aria-labelledby="task-2">
       <h2 id="task-2">4. Task 2 — Invoice-item classification</h2>
-      <p>The headline result: a <strong>24 GB model running locally</strong> reaches <strong>99% accuracy</strong> on a held-out test set — so the solution can run <strong>fully private</strong>, with the cloud used only as an optional escalation tier.</p>
+      <p>The headline result: a <strong>24 GB open-weight model</strong> (<code>qwen3.5-35b-a3b</code>) reaches <strong>99% accuracy</strong> on a held-out test set. It is <strong>deployable fully on-device</strong> — 24 GB fits the target 128 GB machine — so the solution can run <strong>private</strong>, with the cloud used only as an optional escalation tier.</p>
+      <blockquote>
+        <p><em>Note on how this was measured:</em> we benchmarked the model via the <strong>OpenRouter API</strong> for fast iteration. The weights are identical to a local Ollama deployment, so accuracy is a property of the model + method, not of where it runs. The embedding model (BGE-M3) already runs locally. For a fully-offline deployment, the 35B model is downloaded to Ollama (a one-time 24 GB pull); the 9.7B variant is already local.</p>
+      </blockquote>
       <p><strong>How we got there (the journey):</strong></p>
       <ol>
         <li><strong>Baseline.</strong> A small local model alone classified poorly (~60–74% fully-correct) — it confused medical goods, utilities, and cryptic product SKUs.</li>
@@ -316,12 +304,12 @@ Postgres (einvoice, taxpayer)   BGE-M3 vector indexes
         <table>
           <thead>
             <tr>
-              <th>Model</th>
-              <th>Where</th>
-              <th>Config</th>
-              <th>Label</th>
-              <th>Group</th>
-              <th>Fully correct</th>
+              <th scope="col">Model</th>
+              <th scope="col">Where</th>
+              <th scope="col">Config</th>
+              <th scope="col">Label</th>
+              <th scope="col">Group</th>
+              <th scope="col">Fully correct</th>
             </tr>
           </thead>
           <tbody>
@@ -366,7 +354,7 @@ Postgres (einvoice, taxpayer)   BGE-M3 vector indexes
     <section aria-labelledby="methodology">
       <h2 id="methodology">6. Methodology &amp; key decisions</h2>
       <ul>
-        <li><strong>Local-first for privacy</strong> — tax data stays on-device; cloud is an optional escalation tier, not a dependency.</li>
+        <li><strong>Local-first for privacy</strong> — the chosen models are <strong>open-weight and deployable on-device</strong> (tax data need never leave the machine); cloud is an optional escalation tier, not a hard dependency. Accuracy was benchmarked via API on the identical weights.</li>
         <li><strong>Small model + smart context beats raw size</strong> — retrieval (RAG) did most of the work; we did not need a giant model.</li>
         <li><strong>The model improves itself</strong> — the agentic prompt-optimisation loop writes better instructions from its own mistakes.</li>
         <li><strong>Rigorous evaluation</strong> — proper train/dev/test split (6050/1295/1298), tuning only on dev, final numbers on an untouched test set, with misclassifications kept visible.</li>
@@ -374,8 +362,8 @@ Postgres (einvoice, taxpayer)   BGE-M3 vector indexes
       </ul>
     </section>
 
-    <section aria-labelledby="run-it">
-      <h2 id="run-it">7. How to run it</h2>
+    <section aria-labelledby="how-to-run-it">
+      <h2 id="how-to-run-it">7. How to run it</h2>
       <pre><code>export OPENROUTER_API_KEY=$(cat ~/.config/azdata/openrouter.key)   # cloud tier
 /tmp/azx/bin/python ~/Dev/AZdata/src/api.py                        # → http://127.0.0.1:8642/</code></pre>
       <p>The web app opens with four tabs: <strong>NL Query</strong>, <strong>Classify item</strong>, <strong>Evals</strong>, and this <strong>Report</strong>.</p>

@@ -51,7 +51,9 @@ A single `call_llm(provider, model, …)` abstracts four providers, so the same 
 
 ## 4. Task 2 — Invoice-item classification
 
-The headline result: a **24 GB model running locally** reaches **99% accuracy** on a held-out test set — so the solution can run **fully private**, with the cloud used only as an optional escalation tier.
+The headline result: a **24 GB open-weight model** (`qwen3.5-35b-a3b`) reaches **99% accuracy** on a held-out test set. It is **deployable fully on-device** — 24 GB fits the target 128 GB machine — so the solution can run **private**, with the cloud used only as an optional escalation tier.
+
+> *Note on how this was measured:* we benchmarked the model via the **OpenRouter API** for fast iteration. The weights are identical to a local Ollama deployment, so accuracy is a property of the model + method, not of where it runs. The embedding model (BGE-M3) already runs locally. For a fully-offline deployment, the 35B model is downloaded to Ollama (a one-time 24 GB pull); the 9.7B variant is already local.
 
 **How we got there (the journey):**
 
@@ -82,7 +84,7 @@ Good/Service (the core decision) is ~99.4%; the few remaining misses are the gen
 
 ## 6. Methodology & key decisions
 
-- **Local-first for privacy** — tax data stays on-device; cloud is an optional escalation tier, not a dependency.
+- **Local-first for privacy** — the chosen models are **open-weight and deployable on-device** (tax data need never leave the machine); cloud is an optional escalation tier, not a hard dependency. Accuracy was benchmarked via API on the identical weights.
 - **Small model + smart context beats raw size** — retrieval (RAG) did most of the work; we did not need a giant model.
 - **The model improves itself** — the agentic prompt-optimisation loop writes better instructions from its own mistakes.
 - **Rigorous evaluation** — proper train/dev/test split (6050/1295/1298), tuning only on dev, final numbers on an untouched test set, with misclassifications kept visible.

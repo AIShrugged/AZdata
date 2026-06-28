@@ -48,7 +48,16 @@
     .ghost:hover:not(:disabled){background:var(--soft);border-color:#cbd5e1}
     .output{margin-top:20px}.muted{color:var(--muted)}.small{font-size:13px}
     .error{margin-top:16px;border:1px solid #fecdca;border-radius:8px;background:var(--red-bg);color:var(--red);padding:12px 14px;font-weight:620}
-    .label{margin:0 0 7px;color:#344054;font-size:13px;font-weight:720}
+    .label{margin:0;color:#344054;font-size:13px;font-weight:720}
+    .examples{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px}
+    .examples-label{color:var(--muted);font-size:13px;font-weight:680}
+    .chip{
+      min-height:30px;min-width:0;border:1px solid var(--line);border-radius:999px;
+      background:#fff;color:#344054;padding:0 10px;font-size:13px;font-weight:650
+    }
+    .chip:hover:not(:disabled){background:#eef4ff;border-color:#b8ccf8;color:#123f88}
+    .pre-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 7px}
+    .copy-sql{min-height:32px;border-radius:6px;padding:0 10px;font-size:13px}
     pre{
       margin:0 0 14px;overflow:auto;white-space:pre-wrap;border:1px solid #263445;
       border-radius:8px;background:#101828;color:#edf4ff;padding:14px;
@@ -73,6 +82,10 @@
     .section{border-top:1px solid var(--line);padding-top:18px;margin-top:18px}
     .section:first-of-type{border-top:0;padding-top:0;margin-top:0}
     h2,h3{margin:0;letter-spacing:0}h2{font-size:22px;line-height:1.25}h3{font-size:16px;margin-bottom:10px}
+    .model-chart{width:100%;height:auto;display:block;margin:2px 0 14px}
+    .chart-axis{stroke:#cbd5e1;stroke-width:1}.chart-grid{stroke:#edf2f7;stroke-width:1}
+    .chart-label{fill:#344054;font-size:12px;font-weight:650}.chart-value{fill:#182230;font-size:12px;font-weight:760}
+    .chart-tick{fill:var(--muted);font-size:11px}
     .bar-list{display:grid;gap:10px}.bar-row{display:grid;gap:5px}
     .bar-label{display:flex;justify-content:space-between;gap:12px;color:#344054;font-size:13px}
     .track{overflow:hidden;height:12px;border-radius:999px;background:#edf2f7}
@@ -86,6 +99,7 @@
       .top{display:grid}.tabs{width:100%}.tab{flex:1;padding:0 8px}main{padding:16px}
       form,#classify-form{grid-template-columns:1fr}button{width:100%}
       .eval-head{align-items:stretch;flex-direction:column}.confusion{grid-template-columns:1fr}.truncate{max-width:260px}
+      .chip,.copy-sql{width:auto}.pre-head{align-items:flex-start;flex-direction:column}
     }
   </style>
 </head>
@@ -116,6 +130,13 @@
           </select>
           <button id="query-button" type="submit">Run</button>
         </form>
+        <div class="examples" aria-label="Query examples">
+          <span class="examples-label">Examples:</span>
+          <button class="chip" type="button" data-fill="question" data-submit="query-form" data-value="turnover for the last 4 days for taxpayer 1234567890">Turnover · last 4 days (EN)</button>
+          <button class="chip" type="button" data-fill="question" data-submit="query-form" data-value="son 4 günün gündəlik dövriyyəsi, vergi ödəyicisi 1234567890">Dövriyyə · son 4 gün (AZ)</button>
+          <button class="chip" type="button" data-fill="question" data-submit="query-form" data-value="total turnover and number of invoices received by buyer T_00000160">Recipient totals</button>
+          <button class="chip" type="button" data-fill="question" data-submit="query-form" data-value="how many invoices did issuer A_00000001 send">Invoices by issuer</button>
+        </div>
         <div id="query-output" class="output"></div>
       </section>
       <section id="classify" class="pane">
@@ -123,6 +144,13 @@
           <input id="item-text" required placeholder="Şpris 10 ml … · Nəqliyyat xidməti">
           <button id="classify-button" type="submit">Classify</button>
         </form>
+        <div class="examples" aria-label="Classification examples">
+          <span class="examples-label">Examples:</span>
+          <button class="chip" type="button" data-fill="item-text" data-submit="classify-form" data-value="Şpris 10 ml 21GХ38mm 3H rezin porşenli (Şpris) (BandBraumann)">Syringe</button>
+          <button class="chip" type="button" data-fill="item-text" data-submit="classify-form" data-value="Çörək tam buğda 500q">Bread</button>
+          <button class="chip" type="button" data-fill="item-text" data-submit="classify-form" data-value="Konserv tunes balığı 185q">Canned fish</button>
+          <button class="chip" type="button" data-fill="item-text" data-submit="classify-form" data-value="Texniki təmir xidmətləri">Service</button>
+        </div>
         <div id="classify-output" class="output"></div>
       </section>
       <section id="evals" class="pane">
@@ -176,13 +204,36 @@
     }
     function renderQueryResult(data){
       const result=data.result||data;
+      const sql=data.sql||result.sql||"";
       const providerModel=[data.provider||result.provider,data.model||result.model].filter(Boolean).join("/");
       const referenceDate=data.reference_date||result.reference_date||"reference_date";
       queryOutput.innerHTML=`
-        <p class="label">Generated SQL</p>
-        <pre><code>${escapeHTML(data.sql||result.sql||"")}</code></pre>
+        <div class="pre-head">
+          <p class="label">Generated SQL</p>
+          <button class="ghost copy-sql" type="button" data-sql="${escapeHTML(sql)}">Copy SQL</button>
+        </div>
+        <pre id="sql-pre"><code>${escapeHTML(sql)}</code></pre>
         ${renderTable(result.columns,result.rows)}
         <div class="caption">${escapeHTML(providerModel||"provider/model")} · ${escapeHTML(referenceDate)}</div>`;
+    }
+    async function copySQL(button){
+      const sql=button.dataset.sql||"";
+      const old=button.textContent;
+      try{
+        if(navigator.clipboard&&navigator.clipboard.writeText){
+          await navigator.clipboard.writeText(sql);
+        }else{
+          const range=document.createRange(),selection=window.getSelection(),pre=$("sql-pre");
+          range.selectNodeContents(pre);selection.removeAllRanges();selection.addRange(range);
+        }
+        button.textContent="Copied ✓";
+        setTimeout(()=>{button.textContent=old},1200);
+      }catch(_err){
+        const range=document.createRange(),selection=window.getSelection(),pre=$("sql-pre");
+        range.selectNodeContents(pre);selection.removeAllRanges();selection.addRange(range);
+        button.textContent="Select to copy";
+        setTimeout(()=>{button.textContent=old},1200);
+      }
     }
     function renderClassifyResult(data){
       const label=String(data.label||"").toUpperCase(),isGood=label==="GOOD",tier=String(data.tier||"unknown");
@@ -200,6 +251,25 @@
           </div>
         </div>`;
     }
+    function renderModelChart(models){
+      if(!Array.isArray(models)||!models.length)return "";
+      const left=220,right=62,top=16,rowH=34,barH=14,width=880,height=top+models.length*rowH+34,chartW=width-left-right;
+      const ticks=[0,25,50,75,100];
+      const grid=ticks.map(t=>{
+        const x=left+(t/100)*chartW;
+        return `<line class="chart-grid" x1="${x}" y1="${top-4}" x2="${x}" y2="${height-24}"></line><text class="chart-tick" x="${x}" y="${height-6}" text-anchor="middle">${t}</text>`;
+      }).join("");
+      const bars=models.map((m,i)=>{
+        const y=top+i*rowH,label=[m.name,m.config].filter(Boolean).join(" · "),value=widthPct(m.fully),barW=(value/100)*chartW;
+        return `<text class="chart-label" x="0" y="${y+12}">${escapeHTML(label)}</text>
+          <rect x="${left}" y="${y}" width="${chartW}" height="${barH}" rx="7" fill="#edf2f7"></rect>
+          <rect x="${left}" y="${y}" width="${barW}" height="${barH}" rx="7" fill="${m.best_local?"#067647":"#175cd3"}"></rect>
+          <text class="chart-value" x="${Math.min(left+barW+8,width-42)}" y="${y+12}">${escapeHTML(pct(m.fully))}%</text>`;
+      }).join("");
+      return `<svg class="model-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Model comparison Fully percent chart">
+        ${grid}<line class="chart-axis" x1="${left}" y1="${height-24}" x2="${width-right}" y2="${height-24}"></line>${bars}
+      </svg>`;
+    }
     function renderModels(models){
       if(!Array.isArray(models)||!models.length)return `<div class="empty">No model results.</div>`;
       const rows=models.map(m=>`
@@ -209,7 +279,7 @@
           <td class="num">${escapeHTML(pct(m.label))}%</td><td class="num">${escapeHTML(pct(m.group))}%</td>
           <td class="num">${escapeHTML(pct(m.fully))}%</td><td>${escapeHTML(m.note)}</td>
         </tr>`).join("");
-      return `<div class="table-wrap"><table><thead><tr><th>Model</th><th>Where</th><th>Config</th><th class="num">Label %</th><th class="num">Group %</th><th class="num">Fully %</th><th>Note</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      return `${renderModelChart(models)}<div class="table-wrap"><table><thead><tr><th>Model</th><th>Where</th><th>Config</th><th class="num">Label %</th><th class="num">Group %</th><th class="num">Fully %</th><th>Note</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     }
     function renderBars(items,lowRed){
       const entries=Array.isArray(items)?items.map(i=>[i.stage,i.fully]):Object.entries(items||{});
@@ -259,6 +329,14 @@
       document.querySelectorAll(".pane").forEach(pane=>pane.classList.toggle("active",pane.id===tab.dataset.tab));
       if(tab.dataset.tab==="evals"&&!evalsLoaded)loadEvals();
     }));
+    document.querySelectorAll(".chip").forEach(chip=>chip.addEventListener("click",()=>{
+      $(chip.dataset.fill).value=chip.dataset.value;
+      $(chip.dataset.submit).requestSubmit();
+    }));
+    $("query-output").addEventListener("click",event=>{
+      const button=event.target.closest(".copy-sql");
+      if(button)copySQL(button);
+    });
     $("query-form").addEventListener("submit",event=>{
       event.preventDefault();
       withButton($("query-button"),"…",async()=>{
