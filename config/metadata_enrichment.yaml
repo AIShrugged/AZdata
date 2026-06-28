@@ -1,0 +1,105 @@
+# Metadata-catalog enrichment — layered on top of the structure parsed from db/schema.sql.
+# The parser builds {table, column, type, comment} from the DDL; this file adds the
+# business concept, AZ/EN synonyms, semantic role, and default aggregation that the
+# NL->SQL engine needs to map natural language (Azerbaijani or English) to columns.
+#
+# role: measure | dimension | time | id
+# default_agg: sum | avg | count | min | max   (measures only)
+
+einvoice:
+  description_en: Electronic invoice header
+  description_az: Elektron qaimə-faktura (başlıq)
+  columns:
+    supplier_tin:
+      concept_en: Submitting taxpayer
+      concept_az: Təqdim edən vergi ödəyicisi (satıcı)
+      role: dimension
+      synonyms: [issuer, seller, supplier, "supplier TIN", "issuer TIN", satıcı, təchizatçı, "satıcı VÖEN", VÖEN, TIN]
+    recipient_tin:
+      concept_en: Receiving taxpayer
+      concept_az: Alan vergi ödəyicisi (alıcı)
+      role: dimension
+      synonyms: [recipient, buyer, customer, "recipient TIN", alıcı, müştəri, "alıcı VÖEN"]
+    einvoice_date:
+      concept_en: Invoice date
+      concept_az: Qaimə tarixi
+      role: time
+      synonyms: [date, "invoice date", "e-invoice date", tarix, "qaimə tarixi"]
+    approval_date:
+      concept_en: Approval date
+      concept_az: Təsdiq tarixi
+      role: time
+      synonyms: [approved, "approval date", "təsdiq tarixi"]
+    series:
+      concept_en: E-invoice series
+      concept_az: Qaimə seriyası
+      role: dimension
+      synonyms: [series, seriya]
+    number:
+      concept_en: E-invoice number
+      concept_az: Qaimə nömrəsi
+      role: dimension
+      synonyms: [number, "invoice number", nömrə]
+    excise_amount:
+      concept_en: Excise amount
+      concept_az: Aksiz məbləği
+      role: measure
+      default_agg: sum
+      synonyms: [excise, aksiz]
+    vat_taxable_amount:
+      concept_en: VAT-taxable transactions amount
+      concept_az: ƏDV-yə cəlb edilən əməliyyatların məbləği
+      role: measure
+      default_agg: sum
+      synonyms: ["vat taxable", "taxable amount", "ƏDV-li məbləğ"]
+    non_vat_taxable_amount:
+      concept_en: Non-VAT-taxable transactions amount
+      concept_az: ƏDV-yə cəlb edilməyən əməliyyatların məbləği
+      role: measure
+      default_agg: sum
+      synonyms: ["non vat", "non-taxable"]
+    vat_exempt_amount:
+      concept_en: VAT-exempt transactions amount
+      concept_az: ƏDV-dən azad əməliyyatların məbləği
+      role: measure
+      default_agg: sum
+      synonyms: ["vat exempt", "exempt", "azad"]
+    zero_rated_amount:
+      concept_en: Zero-rated VAT transactions amount
+      concept_az: Sıfır dərəcəli ƏDV əməliyyatlarının məbləği
+      role: measure
+      default_agg: sum
+      synonyms: ["zero rated", "0% vat", "sıfır dərəcəli"]
+    vat_amount:
+      concept_en: VAT amount
+      concept_az: ƏDV məbləği
+      role: measure
+      default_agg: sum
+      synonyms: [VAT, "ƏDV", "ƏDV məbləği", tax]
+    road_tax:
+      concept_en: Road tax
+      concept_az: Yol vergisi
+      role: measure
+      default_agg: sum
+      synonyms: ["road tax", "yol vergisi"]
+    total_amount:
+      concept_en: Turnover
+      concept_az: Dövriyyə
+      role: measure
+      default_agg: sum
+      synonyms: [turnover, "total amount", revenue, sales, dövriyyə, məbləğ, "ümumi məbləğ", cəmi]
+
+taxpayer:
+  description_en: Taxpayer directory
+  description_az: Vergi ödəyiciləri kataloqu
+  columns:
+    tin:
+      concept_en: Taxpayer TIN
+      concept_az: VÖEN
+      role: id
+      synonyms: [TIN, VÖEN, "tax id", "taxpayer id"]
+    name:
+      concept_en: Taxpayer name
+      concept_az: Vergi ödəyicisinin adı
+      role: dimension
+      synonyms: [name, ad, "company name", "submitter name", "recipient name"]

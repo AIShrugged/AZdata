@@ -1,0 +1,971 @@
+{
+  "by_role": {
+    "dimension": [
+      [
+        "taxpayer",
+        "name"
+      ],
+      [
+        "einvoice",
+        "supplier_tin"
+      ],
+      [
+        "einvoice",
+        "recipient_tin"
+      ],
+      [
+        "einvoice",
+        "series"
+      ],
+      [
+        "einvoice",
+        "number"
+      ]
+    ],
+    "id": [
+      [
+        "taxpayer",
+        "tin"
+      ]
+    ],
+    "measure": [
+      [
+        "einvoice",
+        "excise_amount"
+      ],
+      [
+        "einvoice",
+        "vat_taxable_amount"
+      ],
+      [
+        "einvoice",
+        "non_vat_taxable_amount"
+      ],
+      [
+        "einvoice",
+        "vat_exempt_amount"
+      ],
+      [
+        "einvoice",
+        "zero_rated_amount"
+      ],
+      [
+        "einvoice",
+        "vat_amount"
+      ],
+      [
+        "einvoice",
+        "road_tax"
+      ],
+      [
+        "einvoice",
+        "total_amount"
+      ]
+    ],
+    "time": [
+      [
+        "einvoice",
+        "einvoice_date"
+      ],
+      [
+        "einvoice",
+        "approval_date"
+      ]
+    ]
+  },
+  "synonym_index": {
+    "0% vat": [
+      {
+        "column": "zero_rated_amount",
+        "table": "einvoice"
+      }
+    ],
+    "ad": [
+      {
+        "column": "name",
+        "table": "taxpayer"
+      }
+    ],
+    "aksiz": [
+      {
+        "column": "excise_amount",
+        "table": "einvoice"
+      }
+    ],
+    "aksiz məbləği": [
+      {
+        "column": "excise_amount",
+        "table": "einvoice"
+      }
+    ],
+    "alan vergi ödəyicisi (alıcı)": [
+      {
+        "column": "recipient_tin",
+        "table": "einvoice"
+      }
+    ],
+    "alıcı": [
+      {
+        "column": "recipient_tin",
+        "table": "einvoice"
+      }
+    ],
+    "alıcı vöen": [
+      {
+        "column": "recipient_tin",
+        "table": "einvoice"
+      }
+    ],
+    "approval date": [
+      {
+        "column": "approval_date",
+        "table": "einvoice"
+      }
+    ],
+    "approval_date": [
+      {
+        "column": "approval_date",
+        "table": "einvoice"
+      }
+    ],
+    "approved": [
+      {
+        "column": "approval_date",
+        "table": "einvoice"
+      }
+    ],
+    "azad": [
+      {
+        "column": "vat_exempt_amount",
+        "table": "einvoice"
+      }
+    ],
+    "buyer": [
+      {
+        "column": "recipient_tin",
+        "table": "einvoice"
+      }
+    ],
+    "company name": [
+      {
+        "column": "name",
+        "table": "taxpayer"
+      }
+    ],
+    "customer": [
+      {
+        "column": "recipient_tin",
+        "table": "einvoice"
+      }
+    ],
+    "cəmi": [
+      {
+        "column": "total_amount",
+        "table": "einvoice"
+      }
+    ],
+    "date": [
+      {
+        "column": "einvoice_date",
+        "table": "einvoice"
+      }
+    ],
+    "dövriyyə": [
+      {
+        "column": "total_amount",
+        "table": "einvoice"
+      }
+    ],
+    "e-invoice date": [
+      {
+        "column": "einvoice_date",
+        "table": "einvoice"
+      }
+    ],
+    "e-invoice number": [
+      {
+        "column": "number",
+        "table": "einvoice"
+      }
+    ],
+    "e-invoice series": [
+      {
+        "column": "series",
+        "table": "einvoice"
+      }
+    ],
+    "einvoice_date": [
+      {
+        "column": "einvoice_date",
+        "table": "einvoice"
+      }
+    ],
+    "excise": [
+      {
+        "column": "excise_amount",
+        "table": "einvoice"
+      }
+    ],
+    "excise amount": [
+      {
+        "column": "excise_amount",
+        "table": "einvoice"
+      }
+    ],
+    "excise_amount": [
+      {
+        "column": "excise_amount",
+        "table": "einvoice"
+      }
+    ],
+    "exempt": [
+      {
+        "column": "vat_exempt_amount",
+        "table": "einvoice"
+      }
+    ],
+    "id": [
+      {
+        "column": "id",
+        "table": "einvoice"
+      }
+    ],
+    "invoice date": [
+      {
+        "column": "einvoice_date",
+        "table": "einvoice"
+      }
+    ],
+    "invoice number": [
+      {
+        "column": "number",
+        "table": "einvoice"
+      }
+    ],
+    "issuer": [
+      {
+        "column": "supplier_tin",
+        "table": "einvoice"
+      }
+    ],
+    "issuer tin": [
+      {
+        "column": "supplier_tin",
+        "table": "einvoice"
+      }
+    ],
+    "müştəri": [
+      {
+        "column": "recipient_tin",
+        "table": "einvoice"
+      }
+    ],
+    "məbləğ": [
+      {
+        "column": "total_amount",
+        "table": "einvoice"
+      }
+    ],
+    "name": [
+      {
+        "column": "name",
+        "table": "taxpayer"
+      }
+    ],
+    "non vat": [
+      {
+        "column": "non_vat_taxable_amount",
+        "table": "einvoice"
+      }
+    ],
+    "non-taxable": [
+      {
+        "column": "non_vat_taxable_amount",
+        "table": "einvoice"
+      }
+    ],
+    "non-vat-taxable transactions amount": [
+      {
+        "column": "non_vat_taxable_amount",
+        "table": "einvoice"
+      }
+    ],
+    "non_vat_taxable_amount": [
+      {
+        "column": "non_vat_taxable_amount",
+        "table": "einvoice"
+      }
+    ],
+    "number": [
+      {
+        "column": "number",
+        "table": "einvoice"
+      }
+    ],
+    "nömrə": [
+      {
+        "column": "number",
+        "table": "einvoice"
+      }
+    ],
+    "qaimə nömrəsi": [
+      {
+        "column": "number",
+        "table": "einvoice"
+      }
+    ],
+    "qaimə seriyası": [
+      {
+        "column": "series",
+        "table": "einvoice"
+      }
+    ],
+    "qaimə tarixi": [
+      {
+        "column": "einvoice_date",
+        "table": "einvoice"
+      }
+    ],
+    "receiving taxpayer": [
+      {
+        "column": "recipient_tin",
+        "table": "einvoice"
+      }
+    ],
+    "recipient": [
+      {
+        "column": "recipient_tin",
+        "table": "einvoice"
+      }
+    ],
+    "recipient name": [
+      {
+        "column": "name",
+        "table": "taxpayer"
+      }
+    ],
+    "recipient tin": [
+      {
+        "column": "recipient_tin",
+        "table": "einvoice"
+      }
+    ],
+    "recipient_tin": [
+      {
+        "column": "recipient_tin",
+        "table": "einvoice"
+      }
+    ],
+    "revenue": [
+      {
+        "column": "total_amount",
+        "table": "einvoice"
+      }
+    ],
+    "road tax": [
+      {
+        "column": "road_tax",
+        "table": "einvoice"
+      }
+    ],
+    "road_tax": [
+      {
+        "column": "road_tax",
+        "table": "einvoice"
+      }
+    ],
+    "sales": [
+      {
+        "column": "total_amount",
+        "table": "einvoice"
+      }
+    ],
+    "satıcı": [
+      {
+        "column": "supplier_tin",
+        "table": "einvoice"
+      }
+    ],
+    "satıcı vöen": [
+      {
+        "column": "supplier_tin",
+        "table": "einvoice"
+      }
+    ],
+    "seller": [
+      {
+        "column": "supplier_tin",
+        "table": "einvoice"
+      }
+    ],
+    "series": [
+      {
+        "column": "series",
+        "table": "einvoice"
+      }
+    ],
+    "seriya": [
+      {
+        "column": "series",
+        "table": "einvoice"
+      }
+    ],
+    "submitter name": [
+      {
+        "column": "name",
+        "table": "taxpayer"
+      }
+    ],
+    "submitting taxpayer": [
+      {
+        "column": "supplier_tin",
+        "table": "einvoice"
+      }
+    ],
+    "supplier": [
+      {
+        "column": "supplier_tin",
+        "table": "einvoice"
+      }
+    ],
+    "supplier tin": [
+      {
+        "column": "supplier_tin",
+        "table": "einvoice"
+      }
+    ],
+    "supplier_tin": [
+      {
+        "column": "supplier_tin",
+        "table": "einvoice"
+      }
+    ],
+    "sıfır dərəcəli": [
+      {
+        "column": "zero_rated_amount",
+        "table": "einvoice"
+      }
+    ],
+    "sıfır dərəcəli ədv əməliyyatlarının məbləği": [
+      {
+        "column": "zero_rated_amount",
+        "table": "einvoice"
+      }
+    ],
+    "tarix": [
+      {
+        "column": "einvoice_date",
+        "table": "einvoice"
+      }
+    ],
+    "tax": [
+      {
+        "column": "vat_amount",
+        "table": "einvoice"
+      }
+    ],
+    "tax id": [
+      {
+        "column": "tin",
+        "table": "taxpayer"
+      }
+    ],
+    "taxable amount": [
+      {
+        "column": "vat_taxable_amount",
+        "table": "einvoice"
+      }
+    ],
+    "taxpayer id": [
+      {
+        "column": "tin",
+        "table": "taxpayer"
+      }
+    ],
+    "taxpayer name": [
+      {
+        "column": "name",
+        "table": "taxpayer"
+      }
+    ],
+    "taxpayer tin": [
+      {
+        "column": "tin",
+        "table": "taxpayer"
+      }
+    ],
+    "tin": [
+      {
+        "column": "tin",
+        "table": "taxpayer"
+      },
+      {
+        "column": "supplier_tin",
+        "table": "einvoice"
+      }
+    ],
+    "total amount": [
+      {
+        "column": "total_amount",
+        "table": "einvoice"
+      }
+    ],
+    "total_amount": [
+      {
+        "column": "total_amount",
+        "table": "einvoice"
+      }
+    ],
+    "turnover": [
+      {
+        "column": "total_amount",
+        "table": "einvoice"
+      }
+    ],
+    "təchizatçı": [
+      {
+        "column": "supplier_tin",
+        "table": "einvoice"
+      }
+    ],
+    "təqdim edən vergi ödəyicisi (satıcı)": [
+      {
+        "column": "supplier_tin",
+        "table": "einvoice"
+      }
+    ],
+    "təsdiq tarixi": [
+      {
+        "column": "approval_date",
+        "table": "einvoice"
+      }
+    ],
+    "vat": [
+      {
+        "column": "vat_amount",
+        "table": "einvoice"
+      }
+    ],
+    "vat amount": [
+      {
+        "column": "vat_amount",
+        "table": "einvoice"
+      }
+    ],
+    "vat exempt": [
+      {
+        "column": "vat_exempt_amount",
+        "table": "einvoice"
+      }
+    ],
+    "vat taxable": [
+      {
+        "column": "vat_taxable_amount",
+        "table": "einvoice"
+      }
+    ],
+    "vat-exempt transactions amount": [
+      {
+        "column": "vat_exempt_amount",
+        "table": "einvoice"
+      }
+    ],
+    "vat-taxable transactions amount": [
+      {
+        "column": "vat_taxable_amount",
+        "table": "einvoice"
+      }
+    ],
+    "vat_amount": [
+      {
+        "column": "vat_amount",
+        "table": "einvoice"
+      }
+    ],
+    "vat_exempt_amount": [
+      {
+        "column": "vat_exempt_amount",
+        "table": "einvoice"
+      }
+    ],
+    "vat_taxable_amount": [
+      {
+        "column": "vat_taxable_amount",
+        "table": "einvoice"
+      }
+    ],
+    "vergi ödəyicisinin adı": [
+      {
+        "column": "name",
+        "table": "taxpayer"
+      }
+    ],
+    "vöen": [
+      {
+        "column": "tin",
+        "table": "taxpayer"
+      },
+      {
+        "column": "supplier_tin",
+        "table": "einvoice"
+      }
+    ],
+    "yol vergisi": [
+      {
+        "column": "road_tax",
+        "table": "einvoice"
+      }
+    ],
+    "zero rated": [
+      {
+        "column": "zero_rated_amount",
+        "table": "einvoice"
+      }
+    ],
+    "zero-rated vat transactions amount": [
+      {
+        "column": "zero_rated_amount",
+        "table": "einvoice"
+      }
+    ],
+    "zero_rated_amount": [
+      {
+        "column": "zero_rated_amount",
+        "table": "einvoice"
+      }
+    ],
+    "ümumi məbləğ": [
+      {
+        "column": "total_amount",
+        "table": "einvoice"
+      }
+    ],
+    "ədv": [
+      {
+        "column": "vat_amount",
+        "table": "einvoice"
+      }
+    ],
+    "ədv məbləği": [
+      {
+        "column": "vat_amount",
+        "table": "einvoice"
+      }
+    ],
+    "ədv-dən azad əməliyyatların məbləği": [
+      {
+        "column": "vat_exempt_amount",
+        "table": "einvoice"
+      }
+    ],
+    "ədv-li məbləğ": [
+      {
+        "column": "vat_taxable_amount",
+        "table": "einvoice"
+      }
+    ],
+    "ədv-yə cəlb edilməyən əməliyyatların məbləği": [
+      {
+        "column": "non_vat_taxable_amount",
+        "table": "einvoice"
+      }
+    ],
+    "ədv-yə cəlb edilən əməliyyatların məbləği": [
+      {
+        "column": "vat_taxable_amount",
+        "table": "einvoice"
+      }
+    ]
+  },
+  "tables": {
+    "einvoice": {
+      "columns": {
+        "approval_date": {
+          "comment": "Approval date of the e-invoice",
+          "concept_az": "Təsdiq tarixi",
+          "concept_en": "Approval date",
+          "default": null,
+          "default_agg": null,
+          "nullable": true,
+          "role": "time",
+          "synonyms": [
+            "approved",
+            "approval date",
+            "təsdiq tarixi"
+          ],
+          "type": "date"
+        },
+        "einvoice_date": {
+          "comment": "Invoice date — date of the e-invoice",
+          "concept_az": "Qaimə tarixi",
+          "concept_en": "Invoice date",
+          "default": null,
+          "default_agg": null,
+          "nullable": false,
+          "role": "time",
+          "synonyms": [
+            "date",
+            "invoice date",
+            "e-invoice date",
+            "tarix",
+            "qaimə tarixi"
+          ],
+          "type": "date"
+        },
+        "excise_amount": {
+          "comment": "Excise amount",
+          "concept_az": "Aksiz məbləği",
+          "concept_en": "Excise amount",
+          "default": "0",
+          "default_agg": "sum",
+          "nullable": false,
+          "role": "measure",
+          "synonyms": [
+            "excise",
+            "aksiz"
+          ],
+          "type": "numeric(18,2)"
+        },
+        "id": {
+          "comment": null,
+          "concept_az": null,
+          "concept_en": null,
+          "default": null,
+          "default_agg": null,
+          "nullable": true,
+          "role": null,
+          "synonyms": [],
+          "type": "bigserial"
+        },
+        "non_vat_taxable_amount": {
+          "comment": "Amount of non-VAT-taxable transactions",
+          "concept_az": "ƏDV-yə cəlb edilməyən əməliyyatların məbləği",
+          "concept_en": "Non-VAT-taxable transactions amount",
+          "default": "0",
+          "default_agg": "sum",
+          "nullable": false,
+          "role": "measure",
+          "synonyms": [
+            "non vat",
+            "non-taxable"
+          ],
+          "type": "numeric(18,2)"
+        },
+        "number": {
+          "comment": "E-invoice number",
+          "concept_az": "Qaimə nömrəsi",
+          "concept_en": "E-invoice number",
+          "default": null,
+          "default_agg": null,
+          "nullable": true,
+          "role": "dimension",
+          "synonyms": [
+            "number",
+            "invoice number",
+            "nömrə"
+          ],
+          "type": "bigint"
+        },
+        "recipient_tin": {
+          "comment": "Receiving taxpayer — TIN of the e-invoice recipient",
+          "concept_az": "Alan vergi ödəyicisi (alıcı)",
+          "concept_en": "Receiving taxpayer",
+          "default": null,
+          "default_agg": null,
+          "nullable": false,
+          "role": "dimension",
+          "synonyms": [
+            "recipient",
+            "buyer",
+            "customer",
+            "recipient TIN",
+            "alıcı",
+            "müştəri",
+            "alıcı VÖEN"
+          ],
+          "type": "text"
+        },
+        "road_tax": {
+          "comment": "Road tax",
+          "concept_az": "Yol vergisi",
+          "concept_en": "Road tax",
+          "default": "0",
+          "default_agg": "sum",
+          "nullable": false,
+          "role": "measure",
+          "synonyms": [
+            "road tax",
+            "yol vergisi"
+          ],
+          "type": "numeric(18,2)"
+        },
+        "series": {
+          "comment": "E-invoice series",
+          "concept_az": "Qaimə seriyası",
+          "concept_en": "E-invoice series",
+          "default": null,
+          "default_agg": null,
+          "nullable": true,
+          "role": "dimension",
+          "synonyms": [
+            "series",
+            "seriya"
+          ],
+          "type": "text"
+        },
+        "supplier_tin": {
+          "comment": "Submitting taxpayer — TIN of the e-invoice issuer",
+          "concept_az": "Təqdim edən vergi ödəyicisi (satıcı)",
+          "concept_en": "Submitting taxpayer",
+          "default": null,
+          "default_agg": null,
+          "nullable": false,
+          "role": "dimension",
+          "synonyms": [
+            "issuer",
+            "seller",
+            "supplier",
+            "supplier TIN",
+            "issuer TIN",
+            "satıcı",
+            "təchizatçı",
+            "satıcı VÖEN",
+            "VÖEN",
+            "TIN"
+          ],
+          "type": "text"
+        },
+        "total_amount": {
+          "comment": "Turnover — total amount",
+          "concept_az": "Dövriyyə",
+          "concept_en": "Turnover",
+          "default": "0",
+          "default_agg": "sum",
+          "nullable": false,
+          "role": "measure",
+          "synonyms": [
+            "turnover",
+            "total amount",
+            "revenue",
+            "sales",
+            "dövriyyə",
+            "məbləğ",
+            "ümumi məbləğ",
+            "cəmi"
+          ],
+          "type": "numeric(18,2)"
+        },
+        "vat_amount": {
+          "comment": "VAT amount",
+          "concept_az": "ƏDV məbləği",
+          "concept_en": "VAT amount",
+          "default": "0",
+          "default_agg": "sum",
+          "nullable": false,
+          "role": "measure",
+          "synonyms": [
+            "VAT",
+            "ƏDV",
+            "ƏDV məbləği",
+            "tax"
+          ],
+          "type": "numeric(18,2)"
+        },
+        "vat_exempt_amount": {
+          "comment": "Amount of VAT-exempt transactions",
+          "concept_az": "ƏDV-dən azad əməliyyatların məbləği",
+          "concept_en": "VAT-exempt transactions amount",
+          "default": "0",
+          "default_agg": "sum",
+          "nullable": false,
+          "role": "measure",
+          "synonyms": [
+            "vat exempt",
+            "exempt",
+            "azad"
+          ],
+          "type": "numeric(18,2)"
+        },
+        "vat_taxable_amount": {
+          "comment": "Amount of VAT-taxable transactions",
+          "concept_az": "ƏDV-yə cəlb edilən əməliyyatların məbləği",
+          "concept_en": "VAT-taxable transactions amount",
+          "default": "0",
+          "default_agg": "sum",
+          "nullable": false,
+          "role": "measure",
+          "synonyms": [
+            "vat taxable",
+            "taxable amount",
+            "ƏDV-li məbləğ"
+          ],
+          "type": "numeric(18,2)"
+        },
+        "zero_rated_amount": {
+          "comment": "Amount of zero-rated VAT transactions",
+          "concept_az": "Sıfır dərəcəli ƏDV əməliyyatlarının məbləği",
+          "concept_en": "Zero-rated VAT transactions amount",
+          "default": "0",
+          "default_agg": "sum",
+          "nullable": false,
+          "role": "measure",
+          "synonyms": [
+            "zero rated",
+            "0% vat",
+            "sıfır dərəcəli"
+          ],
+          "type": "numeric(18,2)"
+        }
+      },
+      "comment": "Electronic invoice header",
+      "description_az": "Elektron qaimə-faktura (başlıq)",
+      "description_en": "Electronic invoice header",
+      "primary_key": [
+        "id"
+      ]
+    },
+    "taxpayer": {
+      "columns": {
+        "name": {
+          "comment": "Taxpayer name",
+          "concept_az": "Vergi ödəyicisinin adı",
+          "concept_en": "Taxpayer name",
+          "default": null,
+          "default_agg": null,
+          "nullable": true,
+          "role": "dimension",
+          "synonyms": [
+            "name",
+            "ad",
+            "company name",
+            "submitter name",
+            "recipient name"
+          ],
+          "type": "text"
+        },
+        "tin": {
+          "comment": "Taxpayer identification number (VOEN)",
+          "concept_az": "VÖEN",
+          "concept_en": "Taxpayer TIN",
+          "default": null,
+          "default_agg": null,
+          "nullable": true,
+          "role": "id",
+          "synonyms": [
+            "TIN",
+            "VÖEN",
+            "tax id",
+            "taxpayer id"
+          ],
+          "type": "text"
+        }
+      },
+      "comment": "Taxpayer directory (TIN -> name)",
+      "description_az": "Vergi ödəyiciləri kataloqu",
+      "description_en": "Taxpayer directory",
+      "primary_key": [
+        "tin"
+      ]
+    }
+  }
+}
