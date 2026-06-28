@@ -80,21 +80,27 @@ def retrieve(query_text: str, emb: np.ndarray, meta: list[dict[str, Any]], k: in
     return [meta[int(i)] for i in idx]
 
 
-def build_rag_prompt(text: str, examples: list[dict[str, Any]]) -> tuple[str, str]:
+DEFAULT_INSTRUCTIONS = (
+    "You classify Azerbaijani invoice line items. Decide if the item is a physical GOOD (Mal) "
+    "or a SERVICE (Xidmət). Services are works/activities (construction, transport, repair, "
+    "installation, consulting); goods are physical products. If it is a Good, also assign exactly "
+    "one product group from the list; if it is a Service, group is null. Output ONLY one JSON "
+    'object, no prose, no markdown: {"label": "Good"|"Service", "group": <one of the groups '
+    'or null>, "confidence": <0..1>}. confidence = your probability the label+group are correct.'
+)
+
+
+def build_rag_prompt(text: str, examples: list[dict[str, Any]], instructions: Optional[str] = None) -> tuple[str, str]:
+    base = instructions if instructions is not None else DEFAULT_INSTRUCTIONS
     group_lines = "\n".join(f"- {group}: {GROUP_HINTS[group]}" for group in GROUPS)
     example_lines = []
     for ex in examples:
         suffix = f' / {ex["group"]}' if ex.get("group") else ""
         example_lines.append(f'- "{ex["text"]}" -> {ex["label"]}{suffix}')
     system = (
-        "You classify Azerbaijani invoice line items. Decide if the item is a physical GOOD (Mal) "
-        "or a SERVICE (Xidmət). Services are works/activities (construction, transport, repair, "
-        "installation, consulting); goods are physical products. If it is a Good, also assign exactly "
-        "one product group from the list; if it is a Service, group is null. Output ONLY one JSON "
-        'object, no prose, no markdown: {"label": "Good"|"Service", "group": <one of the groups '
-        "or null>, \"confidence\": <0..1>}. confidence = your probability the label+group are "
-        f"correct.\n\nProduct groups:\n{group_lines}\n\n"
-        "Similar labeled examples (item -> answer):\n"
+        base
+        + f"\n\nProduct groups:\n{group_lines}\n\n"
+        + "Similar labeled examples (item -> answer):\n"
         + "\n".join(example_lines)
     )
     return system, text
@@ -107,12 +113,13 @@ def classify_rag(
     k: int = 8,
     provider: Optional[str] = None,
     model: Optional[str] = None,
+    instructions: Optional[str] = None,
 ) -> dict[str, Any]:
     provider = provider or DEFAULT_PROVIDER
     model = model or DEFAULT_MODELS.get(provider)
     try:
         examples = retrieve(text, emb, meta, k)
-        system, user = build_rag_prompt(text, examples)
+        system, user = build_rag_prompt(text, examples, instructions)
         raw = call_llm(system, user, provider, model)
         norm = normalize(extract_json(raw))
         return {
