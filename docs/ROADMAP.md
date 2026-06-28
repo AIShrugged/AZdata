@@ -39,8 +39,8 @@ presented through a single web app.
 5. ✅ Acceptance test: Scenario 1 reproduced in **EN + AZ** (daily turnover last 4 days, TIN 1234567890 → 25000/18000/31000/22000); real-data recipient query cross-checked vs psql (28 invoices / 59183.83).
 6. ✅ **Backend API** (`src/api.py`, FastAPI): `POST /query` → {sql, rows, columns, reference_date}, `GET /health`, `GET /catalog`; CORS for the web app; provider selectable per request. Guard verified (DELETE/UPDATE/multi-statement DROP/system-catalog/hallucinated-column all blocked); live HTTP smoke-tested.
 
-### Phase 2 — Task 2: two-tier classification — ⬜
-1. Data prep: goods (Mal) + services (Xidmət) labeled set; EQM registry (11,641 codes) index.
+### Phase 2 — Task 2: two-tier classification — 🔄 in progress
+1. ✅ Data prep (`scripts/prep_task2.py` → `data/processed/`): unified `labeled_items.csv` (8643: Good 6503 / Service 2140), stratified `eval_sample.csv` (166, all 7 groups + services), clean `eqm_registry.csv` (11,641 HS codes, leading zeros restored to 10-digit, 9957 active).
 2. Local serving (MLX/Ollama) + prompts: Good/Service, then 7-group classification.
 3. EQM HS-code assignment: BGE-M3 retrieval + LLM rerank.
 4. Two-tier router: confidence threshold → cloud escalation, **token metering**.

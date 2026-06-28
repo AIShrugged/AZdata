@@ -3,6 +3,9 @@
 All notable decisions and changes. Newest first. Dates absolute.
 
 ## 2026-06-28
+### Built (Phase 2 — Task 2 start)
+- `scripts/prep_task2.py` (Codex-authored, Claude-tested) — Task-2 data prep → `data/processed/`: `labeled_items.csv` (8643: Good 6503 / Service 2140), stratified `eval_sample.csv` (166, all 7 groups + services), `eqm_registry.csv` (11,641 HS codes, leading zeros restored to 10-digit, 9957 active).
+
 ### Repo
 - Merged branch `nettle-fragment` (Task 1 implementation) into `main` and **dropped the branch + its worktree**; all code + docs now live on `main` in `~/Dev/AZdata`. `.mcp.json` (ruflo + **codex**) is now tracked on `main`, so Codex MCP tools load when launching from `~/Dev/AZdata`.
 

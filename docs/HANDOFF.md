@@ -4,7 +4,7 @@
 > Last updated: 2026-06-28
 
 ## Where we are
-**Phase 1 (Task 1: NL→SQL + metadata catalog) — ✅ COMPLETE.** Ingestion, metadata catalog, the LLM-backed NL→SQL engine, and the FastAPI backend are all built + verified — Scenario 1 passes in EN + AZ, the guard blocks writes/DDL, and a live uvicorn server serves `/query`. **Next: Phase 2 (Task 2 — Good vs Service classification).**
+**Phase 1 (Task 1: NL→SQL + metadata catalog) — ✅ COMPLETE.** Ingestion, metadata catalog, the LLM-backed NL→SQL engine, and the FastAPI backend are all built + verified — Scenario 1 passes in EN + AZ, the guard blocks writes/DDL, and a live uvicorn server serves `/query`. **Phase 2 (Task 2) started:** data prep done (`scripts/prep_task2.py` → `data/processed/`: labeled_items 8643, eval_sample 166, eqm_registry 11641); **next = Good/Service + 7-group classifier (local LLM), then EQM HS-code retrieval + two-tier router.**
 
 ## Key locations
 - **Repo (cwd):** `~/Dev/AZdata` on branch **`main`**. *(The `nettle-fragment` build branch + worktree were merged into `main` and dropped on 2026-06-28 — all code + docs now live on `main`.)*
