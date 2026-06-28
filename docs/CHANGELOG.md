@@ -3,6 +3,14 @@
 All notable decisions and changes. Newest first. Dates absolute.
 
 ## 2026-06-28
+### Built (Phase 2 — Task 2 backend COMPLETE — classifier 99%, EQM HS-codes, two-tier router)
+- **Classifier hits 99% on the held-out test.** `src/classify.py` (Good/Service + 7-group) + `src/rag.py` (BGE-M3 few-shot retrieval over the train split). Local `qwen3.5-35b-a3b` + RAG(k=16) + `scripts/optimize_prompt.py` (agentic prompt-opt, 122B optimizer rewriting instructions from dev errors) = **99.0% fully / 99.4% label** on the full 1298-item held-out test; `qwen3.5-122b-a10b`+RAG = **99.31%**. RAG lifted the deployable 35B from ~85% → 98.9% (+14 pts); the prompt-opt loop closed the rest. Baselines: 9.7B no-RAG 60.8%, gpt-5.5 (batched) 98.2%.
+- `src/eqm.py`: EQM HS-code assignment — **LLM-first** (predict HS heading → filter the 9957-code registry to that heading → rerank). Fixes the product↔HS semantic gap that pure embedding retrieval couldn't: şpris→9018.31, kateter→9018.39.
+- `src/router.py`: two-tier router (local 35B → escalate to 122B when confidence < 0.9) + full pipeline (classify → HS code for Goods).
+- `src/nlsql.py`: added **openrouter** provider (qwen3.5 35B/122B via API; key at `~/.config/azdata/openrouter.key`, gitignored) + reasoning toggle + request timeout.
+- `scripts/make_splits.py`: stratified train/dev/test (6050/1295/1298).
+- **Headline:** RAG + an agentic prompt-opt loop made a **24 GB local model hit 99%** → fully-local/private deployment is viable; cloud (122B/gpt-5.5) reserved as the escalation tier.
+
 ### Built (Phase 2 — Task 2 start)
 - `scripts/prep_task2.py` (Codex-authored, Claude-tested) — Task-2 data prep → `data/processed/`: `labeled_items.csv` (8643: Good 6503 / Service 2140), stratified `eval_sample.csv` (166, all 7 groups + services), `eqm_registry.csv` (11,641 HS codes, leading zeros restored to 10-digit, 9957 active).
 

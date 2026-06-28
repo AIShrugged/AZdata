@@ -4,7 +4,7 @@
 > Last updated: 2026-06-28
 
 ## Where we are
-**Phase 1 (Task 1: NL→SQL + metadata catalog) — ✅ COMPLETE.** Ingestion, metadata catalog, the LLM-backed NL→SQL engine, and the FastAPI backend are all built + verified — Scenario 1 passes in EN + AZ, the guard blocks writes/DDL, and a live uvicorn server serves `/query`. **Phase 2 (Task 2) started:** data prep done (`scripts/prep_task2.py` → `data/processed/`: labeled_items 8643, eval_sample 166, eqm_registry 11641); **next = Good/Service + 7-group classifier (local LLM), then EQM HS-code retrieval + two-tier router.**
+**Phase 1 (Task 1) — ✅ COMPLETE** (NL→SQL engine + catalog + FastAPI; Scenario 1 EN+AZ; guard blocks writes/DDL). **Phase 2 (Task 2) — backend ✅ COMPLETE:** Good/Service + 7-group classifier hits **99.0% fully / 99.4% label on the held-out 1298-item test** (local `qwen3.5-35b-a3b` + BGE-M3 RAG k=16 + agentic prompt-opt; `122b`+RAG = 99.31%); **EQM HS-code** assignment (LLM-first heading → registry filter → rerank; medical items → correct 9018 codes); **two-tier router** + full pipeline working. **Next: classification API (`/classify`) + Phase 3 web app.**
 
 ## Key locations
 - **Repo (cwd):** `~/Dev/AZdata` on branch **`main`**. *(The `nettle-fragment` build branch + worktree were merged into `main` and dropped on 2026-06-28 — all code + docs now live on `main`.)*
@@ -33,8 +33,17 @@
 4. ✅ **API** (`src/api.py`, FastAPI): `POST /query` → {sql, rows, columns, reference_date}, `GET /health`, `GET /catalog`; CORS on; provider selectable per request. Run: `/tmp/azx/bin/python src/api.py` (port 8000; needs `fastapi uvicorn`). Live-tested.
 5. ✅ **Acceptance test:** Scenario 1 reproduced via the engine in **EN + AZ** (4 rows 25000/18000/31000/22000); real-data recipient query cross-checked vs psql (28 / 59183.83).
 
+## Phase 2 (Task 2) — built, how to run
+- **Models:** local `qwen3.5:latest`(9.7B) + **bge-m3** embeddings via Ollama; strong models via **OpenRouter** (`qwen/qwen3.5-35b-a3b`, `qwen/qwen3.5-122b-a10b`). Key at `~/.config/azdata/openrouter.key` (chmod 600, outside repo). `src/nlsql.py` has an `openrouter` provider; export `OPENROUTER_API_KEY=$(cat ~/.config/azdata/openrouter.key)` before runs.
+- **Splits/data:** `scripts/make_splits.py` → `data/processed/{train,dev,test}.csv` (6050/1295/1298). Large derived CSVs + `*_index.npy` are untracked — regenerate.
+- **Classifier + RAG:** `src/classify.py`, `src/rag.py`. Build index: `python src/rag.py --build` (→ `train_index.*`). `classify_rag(text, emb, meta, k, provider, model, instructions)`. Optimized prompt: `data/processed/best_instructions.txt`.
+- **EQM HS-code:** `src/eqm.py` — `python src/eqm.py --build` (→ `eqm_index.*`, ~15 min). LLM-first: predict heading → filter the 9957-code registry → rerank.
+- **Prompt-opt loop:** `scripts/optimize_prompt.py` (agentic; 122B rewrites instructions from dev errors; ~99% on dev).
+- **Router / full pipeline:** `python src/router.py --demo` (local 35B → escalate to 122B if conf<0.9 → HS code for Goods).
+- **Held-out test (1298):** 35B+RAG+opt = **99.0% fully / 99.4% label**; 122B+RAG = 99.31%. RAG = big lever (+14pts); prompt-opt closed the rest. Venv also needs `numpy openai`.
+
 ## Then
-- Phase 2 (Task 2 classification, two-tier) and Phase 3 (web app) per `ROADMAP.md`.
+- Task 2 **API** (extend `src/api.py` with `/classify`), Phase 3 **web app**, Phase 4 packaging — per `ROADMAP.md`.
 
 ## Constraints / standing rules
 - Do **not** read `~/Downloads` or `~/Desktop`.

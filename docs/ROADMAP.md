@@ -39,13 +39,13 @@ presented through a single web app.
 5. ✅ Acceptance test: Scenario 1 reproduced in **EN + AZ** (daily turnover last 4 days, TIN 1234567890 → 25000/18000/31000/22000); real-data recipient query cross-checked vs psql (28 invoices / 59183.83).
 6. ✅ **Backend API** (`src/api.py`, FastAPI): `POST /query` → {sql, rows, columns, reference_date}, `GET /health`, `GET /catalog`; CORS for the web app; provider selectable per request. Guard verified (DELETE/UPDATE/multi-statement DROP/system-catalog/hallucinated-column all blocked); live HTTP smoke-tested.
 
-### Phase 2 — Task 2: two-tier classification — 🔄 in progress
-1. ✅ Data prep (`scripts/prep_task2.py` → `data/processed/`): unified `labeled_items.csv` (8643: Good 6503 / Service 2140), stratified `eval_sample.csv` (166, all 7 groups + services), clean `eqm_registry.csv` (11,641 HS codes, leading zeros restored to 10-digit, 9957 active).
-2. Local serving (MLX/Ollama) + prompts: Good/Service, then 7-group classification.
-3. EQM HS-code assignment: BGE-M3 retrieval + LLM rerank.
-4. Two-tier router: confidence threshold → cloud escalation, **token metering**.
-5. Eval harness: accuracy / latency / cost; **local vs cloud** comparison.
-6. Backend API endpoints.
+### Phase 2 — Task 2: two-tier classification — ✅ backend done (API + UI remain)
+1. ✅ Data prep (`scripts/prep_task2.py`, `scripts/make_splits.py`): `labeled_items.csv` (8643), stratified `train/dev/test` (6050/1295/1298), `eqm_registry.csv` (11,641; 9957 active).
+2. ✅ **Classifier** (`src/classify.py` + `src/rag.py`, BGE-M3 few-shot RAG): Good/Service + 7-group. **99.0% fully / 99.4% label on held-out 1298-item test** — local `qwen3.5-35b-a3b` + RAG(k=16) + optimized instructions; `122b`+RAG = 99.31%. (RAG +14pts; prompt-opt closed the rest. Baselines: 9.7B 60.8%, gpt-5.5 98.2%.)
+3. ✅ EQM HS-code (`src/eqm.py`): **LLM-first** — predict HS heading → filter registry → rerank. Correct medical codes (syringe→9018.31, catheter→9018.39).
+4. ✅ Two-tier router (`src/router.py`): local 35B → escalate to 122B when confidence < threshold; full pipeline (classify → HS code).
+5. ✅ Eval harness (`scripts/eval_task2.py`, `scripts/optimize_prompt.py`): accuracy/group/confusion + agentic prompt-opt loop; local-vs-cloud compared.
+6. ⬜ **Backend API** (NEXT): extend `src/api.py` with `/classify` (item → label/group/HS-code/tier).
 
 ### Phase 3 — Web app — ⬜
 - Tab 1: NL query (Task 1) → table + chart.
