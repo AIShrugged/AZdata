@@ -81,6 +81,7 @@
     .cell{border:1px solid var(--line);border-radius:8px;padding:12px;background:#fff}
     .cell strong{display:block;font-size:22px;line-height:1.1;margin-top:4px}
     .truncate{max-width:410px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .report-frame{width:100%;height:72vh;border:1px solid var(--line);border-radius:8px;background:#fff}
     @media (max-width:760px){
       .top{display:grid}.tabs{width:100%}.tab{flex:1;padding:0 8px}main{padding:16px}
       form,#classify-form{grid-template-columns:1fr}button{width:100%}
@@ -102,6 +103,7 @@
         <button class="tab active" type="button" data-tab="query">NL Query</button>
         <button class="tab" type="button" data-tab="classify">Classify item</button>
         <button class="tab" type="button" data-tab="evals">Evals</button>
+        <button class="tab" type="button" data-tab="report">Report</button>
       </nav>
     </header>
     <main>
@@ -129,6 +131,9 @@
           <button id="evals-refresh" class="ghost" type="button">Refresh</button>
         </div>
         <div id="evals-output" class="output"></div>
+      </section>
+      <section id="report" class="pane">
+        <iframe class="report-frame" src="/report.html" title="Solution report — how it was done"></iframe>
       </section>
     </main>
   </div>
