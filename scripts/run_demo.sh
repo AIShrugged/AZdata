@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # AZdata demo launcher: preflight-check prerequisites, then start the API + web app.
-set -uo pipefail
+set -u  # NOT pipefail: `... | grep -q` would SIGPIPE the left side and falsely fail checks
 ROOT="$HOME/Dev/AZdata"
 PY="/tmp/azx/bin/python"
 PORT="${AZDATA_API_PORT:-8642}"
@@ -41,14 +41,12 @@ fi
 
 cd "$ROOT"
 AZDATA_API_PORT="$PORT" nohup "$PY" src/api.py > /tmp/azdata_server.log 2>&1 &
-for _ in $(seq 1 60); do
-  if curl -s --max-time 3 "http://127.0.0.1:$PORT/health" 2>/dev/null | grep -q '"status":"ok"'; then
-    ok "server healthy"
-    echo ""
-    echo "  ▶  Open the demo:   http://127.0.0.1:$PORT/"
-    echo "     logs: /tmp/azdata_server.log   stop: pkill -f 'src/api.py'"
-    exit 0
-  fi
-  sleep 1
-done
-bad "server did not become healthy — see /tmp/azdata_server.log"; exit 1
+if curl -s --retry 60 --retry-connrefused --retry-delay 1 --max-time 90 "http://127.0.0.1:$PORT/health" 2>/dev/null | grep -q '"status":"ok"'; then
+  ok "server healthy"
+  echo ""
+  echo "  ▶  Open the demo:   http://127.0.0.1:$PORT/"
+  echo "     logs: /tmp/azdata_server.log   stop: pkill -f 'src/api.py'"
+  exit 0
+else
+  bad "server did not become healthy — see /tmp/azdata_server.log"; exit 1
+fi
