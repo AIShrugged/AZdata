@@ -26,7 +26,7 @@ LLM_TIMEOUT = int(os.environ.get("AZDATA_LLM_TIMEOUT", "120"))
 # Reasoning-capable local models (e.g. qwen3.5) burn minutes "thinking" for simple SQL; off by default.
 OLLAMA_THINK = os.environ.get("AZDATA_LLM_THINK", "false").strip().lower() in ("1", "true", "yes", "on")
 DSN = f"host={os.environ.get('PGHOST') or '/tmp'} port={os.environ.get('PGPORT') or '5432'} dbname={os.environ.get('PGDATABASE') or 'azdata'}"
-DEFAULT_MODELS = {"ollama": "qwen3.5:latest", "openai": "gpt-5.5", "anthropic": "claude-opus-4-8"}
+DEFAULT_MODELS = {"ollama": "qwen3.5:latest", "openai": "gpt-5.5", "anthropic": "claude-opus-4-8", "openrouter": "qwen/qwen3.5-122b-a10b"}
 MODEL_ENV = os.environ.get("AZDATA_LLM_MODEL")
 MODEL = MODEL_ENV or DEFAULT_MODELS.get(PROVIDER, DEFAULT_MODELS["ollama"])
 
@@ -110,6 +110,15 @@ def call_llm(system: str, user: str, provider: str, model: str) -> str:
 
         client = openai.OpenAI()
         resp = client.chat.completions.create(model=model, messages=messages, temperature=0)
+        return str(resp.choices[0].message.content)
+    if provider == "openrouter":
+        import openai
+
+        client = openai.OpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.environ.get("OPENROUTER_API_KEY"), timeout=LLM_TIMEOUT)
+        resp = client.chat.completions.create(
+            model=model, messages=messages, temperature=0,
+            extra_body={"reasoning": {"enabled": OLLAMA_THINK}},  # OLLAMA_THINK defaults false -> no runaway thinking
+        )
         return str(resp.choices[0].message.content)
     if provider == "anthropic":
         import anthropic
