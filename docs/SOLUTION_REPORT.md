@@ -78,6 +78,8 @@ The headline result: a **24 GB open-weight model** (`qwen3.5-35b-a3b`) reaches *
 | **qwen3.5 35B** | **local** | **+ RAG + prompt-opt** | **99.38%** | **99.39%** | **99.00%** ★ |
 | qwen3.5 122B | cloud/API | + RAG | 99.46% | 99.39% | 99.31% |
 
+> **⚠️ These numbers are under re-validation.** A code audit (`docs/AUDIT.md`) found that ~20% of dev/test items leak verbatim — with their gold labels — into the train-based RAG retrieval index (measured 19.5% dev / 20.2% test). That **inflates the figures below (micro *and* macro)**; they are not a valid generalization estimate until the data is re-split (text/source dedup) and the eval is re-run.
+
 Good/Service (the core decision) is ~99.4% (macro-F1 99.2%). **The 7-group figure above is micro-averaged** and is dominated by BAKERY (~73% of Goods); the **macro-F1 is 85.5%**, because the data-starved **DENTAL MEDICINE** class (n=6 total; 1 in test) scores 0% while the other six groups score 99–100% F1. The honest headline for the 7-group task is **micro 99.4% / macro 85.5%**. All numbers reproduce on the untouched test split.
 
 > **Two honest limitations** (see the README *Limitations* section for the full version): (1) the macro/micro gap above is a rare-class **data-starvation** problem (DENTAL, n=6) — fix with more data or an abstain option; (2) the 7 groups are **hardcoded into every prompt**, which is fine for 7 classes but does not scale to thousands — the scalable fix is retrieval-based label selection, the same pattern already used for the 11,641 EQM HS codes.
