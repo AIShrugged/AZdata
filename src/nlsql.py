@@ -101,18 +101,42 @@ SQL: SELECT sum(vat_amount) AS total_vat FROM einvoice WHERE supplier_tin = 'A_0
     return system, question
 
 
+def _transient_exc_types() -> tuple:
+    import socket
+    import urllib.error
+    types: list = [TimeoutError, ConnectionError, socket.timeout, urllib.error.URLError]
+    try:
+        import openai
+        types += [openai.APITimeoutError, openai.APIConnectionError, openai.RateLimitError, openai.InternalServerError]
+    except Exception:
+        pass
+    return tuple(types)
+
+
+_TRANSIENT_EXC = _transient_exc_types()
+
+
+def _is_transient(exc: BaseException) -> bool:
+    import urllib.error
+    if isinstance(exc, urllib.error.HTTPError):
+        return exc.code >= 500 or exc.code == 429  # retry 5xx / rate-limit only — never 4xx
+    return isinstance(exc, _TRANSIENT_EXC)
+
+
 def _with_retries(fn, attempts=None):
+    """Retry ONLY transient failures (timeouts, conn errors, 5xx, 429) with backoff.
+    Permanent errors (400/401/model-not-found/bugs) surface immediately."""
     attempts = attempts or AZDATA_LLM_RETRIES
     last = None
     for i in range(attempts):
         try:
             return fn()
-        except Exception as exc:  # transient: timeouts, 5xx, rate limits, conn errors
-            last = exc
-            if i == attempts - 1:
+        except Exception as exc:
+            if not _is_transient(exc) or i == attempts - 1:
                 raise
+            last = exc
             time.sleep(min(2 ** i, 8))
-    raise last
+    raise last  # pragma: no cover
 
 
 def call_llm(system: str, user: str, provider: str, model: str) -> str:
@@ -136,13 +160,16 @@ def call_llm(system: str, user: str, provider: str, model: str) -> str:
     if provider == "openai":
         import openai
 
-        client = openai.OpenAI()
+        client = openai.OpenAI(max_retries=0)  # max_retries=0: our _with_retries is the single retry layer
         resp = _with_retries(lambda: client.chat.completions.create(model=model, messages=messages, temperature=0))
         return str(resp.choices[0].message.content)
     if provider == "openrouter":
         import openai
 
-        client = openai.OpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.environ.get("OPENROUTER_API_KEY"), timeout=LLM_TIMEOUT)
+        key = os.environ.get("OPENROUTER_API_KEY")
+        if not key:
+            raise RuntimeError("OPENROUTER_API_KEY is not set — cannot use the openrouter provider")
+        client = openai.OpenAI(base_url="https://openrouter.ai/api/v1", api_key=key, timeout=LLM_TIMEOUT, max_retries=0)
         resp = _with_retries(lambda: client.chat.completions.create(
             model=model, messages=messages, temperature=0,
             extra_body={"reasoning": {"enabled": OLLAMA_THINK}},  # OLLAMA_THINK defaults false -> no runaway thinking
@@ -151,7 +178,7 @@ def call_llm(system: str, user: str, provider: str, model: str) -> str:
     if provider == "anthropic":
         import anthropic
 
-        client = anthropic.Anthropic()
+        client = anthropic.Anthropic(max_retries=0)
         resp = _with_retries(lambda: client.messages.create(model=model, max_tokens=1024, system=system, messages=[{"role": "user", "content": user}], temperature=0))
         return str(resp.content[0].text)
     raise ValueError(f"Unsupported provider: {provider}")
@@ -382,8 +409,15 @@ def answer(
         result["columns"] = columns
         result["rows"] = rows
         result["row_count"] = len(rows)
+    except GuardError as exc:
+        result["error"] = f"{exc.__class__.__name__}: {exc}"
+        result["error_kind"] = "input"      # bad/unsafe SQL → HTTP 400
+    except psycopg2.Error as exc:
+        result["error"] = f"{exc.__class__.__name__}: {exc}"
+        result["error_kind"] = "db"         # DB outage/timeout → HTTP 503
     except Exception as exc:
         result["error"] = f"{exc.__class__.__name__}: {exc}"
+        result["error_kind"] = "upstream"   # LLM/provider/connection → HTTP 503
     return result
 
 

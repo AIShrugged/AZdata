@@ -56,14 +56,18 @@ def classify_route(
             chosen, tier, escalated = strong, "strong", True
         else:
             chosen, tier, escalated = local, "local", True
-    return {
+    result = {
         "label": chosen.get("label"),
         "group": chosen.get("group"),
         "confidence": chosen.get("confidence"),
         "tier": tier,
         "escalated": escalated,
         "local_confidence": local.get("confidence"),
+        "ok": bool(chosen.get("ok")),
     }
+    if not chosen.get("ok"):
+        result["error"] = chosen.get("error") or "classification failed"
+    return result
 
 def classify_item(
     item_text: str,
@@ -87,7 +91,7 @@ def classify_item(
             model=route_kwargs.get("strong_model", STRONG_MODEL),
         )
         hs_code, hs_desc = hs.get("code"), hs.get("description")
-    return {
+    out = {
         "item": item_text,
         "label": c["label"],
         "group": c["group"],
@@ -96,7 +100,11 @@ def classify_item(
         "tier": c["tier"],
         "escalated": c["escalated"],
         "confidence": c["confidence"],
+        "ok": c.get("ok", True),
     }
+    if c.get("error"):
+        out["error"] = c["error"]
+    return out
 
 def load_all() -> tuple[Any, list[dict[str, Any]], Any, list[dict[str, Any]]]:
     rag_emb, rag_meta = rag.load_index(ROOT / "data/processed/train_index")

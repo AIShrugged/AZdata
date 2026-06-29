@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import sys
+import time
 import urllib.request
 from pathlib import Path
 from typing import Any, Optional
@@ -18,6 +19,8 @@ from nlsql import DEFAULT_MODELS, PROVIDER as DEFAULT_PROVIDER, call_llm
 ROOT = Path(__file__).resolve().parents[1]
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 EMBED_MODEL = os.environ.get("AZDATA_EMBED_MODEL", "bge-m3")
+EMBED_TIMEOUT = int(os.environ.get("AZDATA_EMBED_TIMEOUT", os.environ.get("AZDATA_LLM_TIMEOUT", "120")))
+EMBED_RETRIES = int(os.environ.get("AZDATA_EMBED_RETRIES", "3"))
 
 
 def embed_texts(texts: list[str], batch: int = 64) -> np.ndarray:
@@ -32,8 +35,16 @@ def embed_texts(texts: list[str], batch: int = 64) -> np.ndarray:
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        with urllib.request.urlopen(req) as resp:
-            body = json.loads(resp.read().decode("utf-8"))
+        body = None
+        for attempt in range(EMBED_RETRIES):  # timeout + retry: a stalled Ollama must not hang the API
+            try:
+                with urllib.request.urlopen(req, timeout=EMBED_TIMEOUT) as resp:
+                    body = json.loads(resp.read().decode("utf-8"))
+                break
+            except Exception:
+                if attempt == EMBED_RETRIES - 1:
+                    raise
+                time.sleep(min(2 ** attempt, 8))
         if "embeddings" not in body:
             raise RuntimeError("Ollama embed response missing 'embeddings'")
         embeddings.extend(body["embeddings"])

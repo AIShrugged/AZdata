@@ -42,6 +42,11 @@ def _cache_put(cache, key, value):
         cache.popitem(last=False)
 
 
+def _status_for(result: dict) -> int:
+    # input/guard errors are the client's fault (400); DB/provider outages are transient (503).
+    return 400 if result.get("error_kind") == "input" else 503
+
+
 app = FastAPI(title="AZdata e-invoice AI", version="0.2.0")
 app.add_middleware(
     CORSMiddleware,
@@ -126,7 +131,7 @@ def query(req: QueryRequest) -> Any:
     ms = int((time.time() - start) * 1000)
     log.info("query question=%r latency_ms=%d cache=%s provider=%s", req.question[:60], ms, "miss", provider)
     if result.get("error"):
-        return JSONResponse(status_code=400, content=result)
+        return JSONResponse(status_code=_status_for(result), content=result)
     return result
 
 
@@ -170,16 +175,18 @@ def classify(req: ClassifyRequest) -> Any:
             assign_hs=req.assign_hs,
             **route_kwargs,
         )
-        if not result.get("error"):
-            _cache_put(_classify_cache, key, result)
+        if result.get("label") is not None and not result.get("error"):
+            _cache_put(_classify_cache, key, result)  # cache real successes only — never a failure/null
         ms = int((time.time() - start) * 1000)
         log.info("classify text=%r latency_ms=%d cache=%s tier=%s escalated=%s", req.text[:60], ms, "miss", result.get("tier"), result.get("escalated"))
+        if result.get("error"):
+            return JSONResponse(status_code=503, content=result)
         return result
     except Exception as exc:
-        result = {"error": str(exc)}
+        result = {"error": str(exc), "error_kind": "upstream"}
         ms = int((time.time() - start) * 1000)
-        log.info("classify text=%r latency_ms=%d cache=%s tier=%s escalated=%s", req.text[:60], ms, "miss", result.get("tier"), result.get("escalated"))
-        return JSONResponse(status_code=400, content=result)
+        log.info("classify text=%r latency_ms=%d cache=%s tier=%s escalated=%s", req.text[:60], ms, "miss", None, None)
+        return JSONResponse(status_code=503, content=result)
 
 
 @app.get("/evals")
