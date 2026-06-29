@@ -3,6 +3,14 @@
 All notable decisions and changes. Newest first. Dates absolute.
 
 ## 2026-06-29
+### Audit remediation (6 phases — all committed, tests green)
+1. **Eval integrity (HIGH).** Found ~20% verbatim train/eval leakage (`make_splits.py` split raw rows, so identical items scattered across splits and the RAG index handed eval items their own answer). Rewrote it to split **unique texts** with a zero-overlap assertion; rebuilt the index; re-ran. **Validated leak-free:** Good/Service 99.5% (macro-F1 99.4%); 7-group micro 98.9% / macro-F1 82.7%; fully-correct 98.9%. Added `scripts/eval_clean.py` (macro-aware).
+2. **SQL-guard hardening (HIGH).** `guard_sql` now enforces a function allowlist (blocks `database_to_xml`/`query_to_xml`/`dblink`/`pg_read_file`/`pg_sleep`/`lo_*` exfiltration + DoS), rejects schema-qualified tables and system columns; `execute_readonly` SET ROLEs into a least-privilege `azdata_ro` role (`db/readonly_role.sql`). +9 security unit tests.
+3. **Reliability.** Embedding timeout + retry (was unbounded → could hang the whole sync API incl `/health`); transient-only LLM retries (no 4xx retry, no SDK stacking); fail-fast on missing `OPENROUTER_API_KEY`; ok/error propagated through the router; cache successes only; transient errors → 5xx.
+4. **API hardening.** Opt-in API-key auth, per-client rate limiting, CORS lockdown, server-side provider/model allowlist, sanitized errors (no `raw_sql`/exception leak) + correlation ids, thread-safe LRU caches.
+5. **EQM + prompt-opt.** EQM correctness fixes (candidate union so a wrong heading can't drop the true code; confidence parsed defensively + consistent with the returned code); HS accuracy now **measured** (`scripts/eval_eqm.py` + starter gold — **~38% heading / 50% candidate-recall**, the weakest component); the prompt-optimizer now selects on a **held-out** split with a margin (was in-sample).
+6. **Quick wins.** Case-insensitive group match, `AZDATA_LLM_MODEL` provider-override fix, float32 + argpartition retrieval, schema-block cache, reference-date memoize, dead-code removal, shared JSON parser, `anthropic` dependency. **25 unit + 16 e2e pass; CI green.**
+
 ### Shared & hardened
 - **Published to GitHub:** `AIShrugged/AZdata` (private) — full code + docs. Added comprehensive `README.md` and `docs/ARCHITECTURE.md` (every module + process explained), plus `.gitignore` and `requirements.txt`; untracked local AI-tooling config.
 - **Performance:** cached the catalog (`nlsql.cached_catalog()` — was rebuilt on every `/query`); bounded LRU caches for `/query` + `/classify` (temperature-0 deterministic) → repeated requests in ~ms (`/query` 1.07s → 0.004s on cache hit).

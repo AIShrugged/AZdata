@@ -176,3 +176,20 @@ Large derived artifacts (vector indexes, big CSVs) are git-ignored and rebuilt l
 - **Services required at run time:** Postgres (`azdata`), Ollama (for BGE-M3 embeddings; and for the `ollama` LLM provider), and the OpenRouter key (for the cloud tier). `scripts/run_demo.sh` verifies all of these.
 - **Secrets:** the OpenRouter key lives at `~/.config/azdata/openrouter.key` — **outside** the repo, never committed.
 - **The `local` tier in the demo** calls the 35 B via OpenRouter (the same open weights). For a fully-offline deployment, `ollama pull` the 35 B model and point the local tier at it.
+
+## 12. Security & reliability config (audit remediation)
+
+See [`AUDIT.md`](AUDIT.md) for the findings these address. The defaults keep the local demo working with no env set; production sets the security vars.
+
+| var | default | purpose |
+|---|---|---|
+| `AZDATA_API_KEY` | `""` (off) | if set, `/query` + `/classify` require a matching `X-API-Key` header |
+| `AZDATA_RATE_LIMIT` | `60` | requests / 60 s per client (key or IP) → 429 over limit |
+| `AZDATA_CORS_ORIGINS` | `127.0.0.1:8642,localhost:8642` | allowed browser origins (was `*`) |
+| `AZDATA_ALLOWED_PROVIDERS` / `AZDATA_ALLOWED_MODELS` | openrouter,ollama / the 3 known models | server-side allowlist so clients can't force arbitrary paid models |
+| `AZDATA_DEBUG` | `false` | when false, responses omit `raw_sql` and replace internal error text with a correlation id (logged); `run_demo.sh` sets it true |
+| `AZDATA_DB_ROLE` | `azdata_ro` | least-privilege role the executor SET ROLEs into (`db/readonly_role.sql`); `""` disables |
+| `AZDATA_EMBED_TIMEOUT` / `AZDATA_LLM_RETRIES` | 120 / 3 | embedding request timeout; transient-only retry budget |
+
+- **SQL safety is now layered:** the `guard_sql` function allowlist + schema/system-column rejection, *and* the `azdata_ro` DB role (SELECT on the two tables only, non-superuser) — so a guard bypass still cannot write, read other tables, or use superuser functions.
+- **Eval is reproducible & leak-free:** `scripts/make_splits.py` asserts zero train↔eval text overlap; `scripts/eval_clean.py` reports micro **and** macro; `scripts/eval_eqm.py` measures HS-code accuracy against `data/processed/eqm_gold.csv`.
