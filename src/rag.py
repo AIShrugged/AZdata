@@ -84,10 +84,14 @@ def load_index(out_prefix: Path) -> tuple[np.ndarray, list[dict[str, Any]]]:
 
 
 def retrieve(query_text: str, emb: np.ndarray, meta: list[dict[str, Any]], k: int) -> list[dict[str, Any]]:
-    qe = _l2norm(embed_texts([query_text]))[0].astype(np.float64)
+    qe = _l2norm(embed_texts([query_text]))[0]
     with np.errstate(divide="ignore", over="ignore", invalid="ignore"):  # macOS BLAS sets spurious FP flags
-        sims = np.nan_to_num(emb.astype(np.float64) @ qe, nan=-1.0, posinf=-1.0, neginf=-1.0)
-    idx = np.argsort(-sims)[:k]
+        sims = np.nan_to_num(emb @ qe, nan=-1.0, posinf=-1.0, neginf=-1.0)
+    kk = min(k, sims.shape[0])
+    if kk <= 0:
+        return []
+    idx = np.argpartition(-sims, kk - 1)[:kk]
+    idx = idx[np.argsort(-sims[idx])]
     return [meta[int(i)] for i in idx]
 
 

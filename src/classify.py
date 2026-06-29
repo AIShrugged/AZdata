@@ -18,6 +18,7 @@ GROUPS = [
     "PUBLIC UTILITIES WATER",
     "DENTAL MEDICINE",
 ]
+_CANON_GROUP = {g.casefold(): g for g in GROUPS}
 
 GROUP_HINTS: dict[str, str] = {
     "BAKERY": "bread, cakes, baklava, pastry, confectionery (çörək, tort, paxlava, şirniyyat)",
@@ -113,8 +114,7 @@ def _normalize_confidence(value: Any) -> float:
 def normalize(obj: dict[str, Any]) -> dict[str, Any]:
     label = _normalize_label(obj.get("label"))
     group = obj.get("group")
-    if not isinstance(group, str) or group not in GROUPS:
-        group = None
+    group = _CANON_GROUP.get(str(group).strip().casefold()) if group is not None else None
     if label != "Good":
         group = None
     return {
@@ -152,35 +152,3 @@ def classify(text: str, provider: Optional[str] = None, model: Optional[str] = N
             "model": model,
             "error": str(exc),
         }
-
-
-def classify_with_escalation(
-    text: str,
-    local: Optional[tuple[str, str]] = None,
-    cloud: Optional[tuple[str, str]] = None,
-    threshold: float = 0.75,
-) -> dict[str, Any]:
-    default_pair = (DEFAULT_PROVIDER, DEFAULT_MODELS.get(DEFAULT_PROVIDER) or "")
-    local = local or default_pair
-    cloud = cloud or default_pair
-    local_result = classify(text, local[0], local[1])
-    if local_result.get("ok") and float(local_result.get("confidence") or 0.0) >= threshold:
-        chosen = local_result
-        tier = "local"
-        cloud_result = None
-    else:
-        cloud_result = classify(text, cloud[0], cloud[1])
-        if cloud_result.get("ok"):
-            chosen = cloud_result
-            tier = "cloud"
-        else:
-            chosen = local_result
-            tier = "local"
-    return {
-        "label": chosen.get("label"),
-        "group": chosen.get("group"),
-        "confidence": chosen.get("confidence"),
-        "tier": tier,
-        "local": local_result,
-        "cloud": cloud_result,
-    }

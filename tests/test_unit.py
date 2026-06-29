@@ -10,7 +10,7 @@ import eqm
 import rag
 from catalog import build_catalog
 from classify import GROUPS, extract_json, normalize
-from nlsql import GuardError, guard_sql
+from nlsql import GuardError, extract_sql, guard_sql
 
 
 CAT = build_catalog()
@@ -89,9 +89,25 @@ def test_normalize_group_guard():
     assert "BAKERY" in GROUPS
 
 
+def test_normalize_group_canonicalizes_case_and_space():
+    assert normalize({"label": "Good", "group": " bakery "})["group"] == "BAKERY"
+
+
 def test_extract_json_fenced():
     data = extract_json('```json\n{"label":"Good","group":"BAKERY","confidence":0.8}\n```')
     assert data["label"] == "Good"
+
+
+def test_extract_sql_fenced():
+    assert extract_sql("```sql\nSELECT 1 FROM einvoice\n```") == "SELECT 1 FROM einvoice"
+
+
+def test_extract_sql_strips_think_block():
+    assert extract_sql("<think>reasoning</think>\nSELECT 1 FROM einvoice") == "SELECT 1 FROM einvoice"
+
+
+def test_extract_sql_strips_leading_prose():
+    assert extract_sql("Here is the query:\nSELECT 1 FROM einvoice").startswith("SELECT")
 
 
 def test_eqm_clean_query():

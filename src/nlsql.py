@@ -32,8 +32,9 @@ OLLAMA_THINK = os.environ.get("AZDATA_LLM_THINK", "false").strip().lower() in ("
 DSN = f"host={os.environ.get('PGHOST') or '/tmp'} port={os.environ.get('PGPORT') or '5432'} dbname={os.environ.get('PGDATABASE') or 'azdata'}"
 DEFAULT_MODELS = {"ollama": "qwen3.5:latest", "openai": "gpt-5.5", "anthropic": "claude-opus-4-8", "openrouter": "qwen/qwen3.5-122b-a10b"}
 MODEL_ENV = os.environ.get("AZDATA_LLM_MODEL")
-MODEL = MODEL_ENV or DEFAULT_MODELS.get(PROVIDER, DEFAULT_MODELS["ollama"])
 _CATALOG_CACHE: dict[str, Any] = {}
+_SCHEMA_CACHE: dict = {}
+_REF_DATE_CACHE: dict = {}
 
 
 class GuardError(Exception):
@@ -61,6 +62,9 @@ def reference_date(conn: Any) -> dt.date:
 
 
 def _schema_block(catalog: dict[str, Any]) -> str:
+    key = id(catalog)
+    if key in _SCHEMA_CACHE:
+        return _SCHEMA_CACHE[key]
     lines: list[str] = []
     for table in sorted(catalog["tables"]):
         columns = catalog["tables"][table]["columns"]
@@ -75,7 +79,9 @@ def _schema_block(catalog: dict[str, Any]) -> str:
             if synonyms:
                 line += " synonyms: " + ", ".join(synonyms)
             lines.append(line)
-    return "\n".join(lines)
+    block = "\n".join(lines)
+    _SCHEMA_CACHE[key] = block
+    return block
 
 
 def build_prompt(question: str, catalog: dict[str, Any], ref_date: dt.date) -> tuple[str, str]:
@@ -387,17 +393,21 @@ def answer(
     ref_date: dt.date | str | None = None,
 ) -> dict[str, Any]:
     provider = provider.lower()
-    chosen_model = model or MODEL_ENV or DEFAULT_MODELS.get(provider, DEFAULT_MODELS["ollama"])
+    chosen_model = model or (MODEL_ENV if provider == PROVIDER else None) or DEFAULT_MODELS.get(provider, DEFAULT_MODELS["ollama"])
     parsed_ref = dt.date.fromisoformat(ref_date) if isinstance(ref_date, str) else ref_date
     result = _base_result(question, provider, chosen_model, parsed_ref)
     try:
         catalog = cached_catalog()
         if parsed_ref is None:
-            conn = psycopg2.connect(DSN)
-            try:
-                parsed_ref = reference_date(conn)
-            finally:
-                conn.close()
+            if "v" in _REF_DATE_CACHE:
+                parsed_ref = _REF_DATE_CACHE["v"]
+            else:
+                conn = psycopg2.connect(DSN)
+                try:
+                    parsed_ref = reference_date(conn)
+                finally:
+                    conn.close()
+                _REF_DATE_CACHE["v"] = parsed_ref
             result["reference_date"] = parsed_ref.isoformat()
         system, user = build_prompt(question, catalog, parsed_ref)
         raw_text = call_llm(system, user, provider, chosen_model)

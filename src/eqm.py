@@ -6,7 +6,7 @@ from typing import Any, Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from rag import embed_texts, _l2norm
 from nlsql import call_llm, DEFAULT_MODELS, PROVIDER as DEFAULT_PROVIDER
-from classify import _normalize_confidence
+from classify import _normalize_confidence, extract_json
 
 import numpy as np, json, csv, os, re, argparse
 
@@ -32,7 +32,7 @@ def build_eqm_index() -> None:
     meta: list[dict[str, Any]] = []
     descriptions: list[str] = []
     for row in rows:
-        if not (row.get("active") is True or row.get("active") == "True"):
+        if str(row.get("active", "")).strip().lower() not in {"true", "1", "t", "yes"}:
             continue
         item = {"code": _clean(row.get("code")), "description": _clean(row.get("description")), "unit": _clean(row.get("unit"))}
         meta.append(item)
@@ -58,50 +58,15 @@ def _clean_query(text: str) -> str:
 
 
 def retrieve_codes(item_text: str, emb: np.ndarray, meta: list[dict[str, Any]], k: int) -> list[dict[str, Any]]:
-    qe = _l2norm(embed_texts([_clean_query(item_text)]))[0].astype(np.float64)
+    qe = _l2norm(embed_texts([_clean_query(item_text)]))[0]
     with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
-        sims = np.nan_to_num(emb.astype(np.float64) @ qe, nan=-1.0)
-    return [meta[int(i)] for i in np.argsort(-sims)[:k]]
-
-
-def _json(text: str) -> dict[str, Any]:
-    while True:
-        start = text.find("<think>")
-        end = text.find("</think>", start + 7)
-        if start < 0 or end < 0:
-            break
-        text = text[:start] + text[end + 8 :]
-    text = text.strip()
-    if text.startswith("```"):
-        lines = text.splitlines()
-        lines = lines[1:] if lines else []
-        if lines and lines[-1].strip() == "```":
-            lines = lines[:-1]
-        text = "\n".join(lines).strip()
-    start = text.find("{")
-    if start < 0:
-        return {}
-    depth = 0
-    in_string = False
-    escape = False
-    for pos in range(start, len(text)):
-        ch = text[pos]
-        if escape:
-            escape = False; continue
-        if ch == "\\":
-            escape = True; continue
-        if ch == '"':
-            in_string = not in_string; continue
-        if in_string:
-            continue
-        if ch == "{":
-            depth += 1
-        elif ch == "}":
-            depth -= 1
-            if depth == 0:
-                obj = json.loads(text[start : pos + 1])
-                return obj if isinstance(obj, dict) else {}
-    return {}
+        sims = np.nan_to_num(emb @ qe, nan=-1.0)
+    kk = min(k, sims.shape[0])
+    if kk <= 0:
+        return []
+    top = np.argpartition(-sims, kk - 1)[:kk]
+    top = top[np.argsort(-sims[top])]
+    return [meta[int(i)] for i in top]
 
 
 def predict_headings(item_text: str, group: Optional[str], provider: str, model: Optional[str]) -> list[str]:
@@ -112,7 +77,7 @@ def predict_headings(item_text: str, group: Optional[str], provider: str, model:
     )
     user = f"PRODUCT: {item_text}\nCATEGORY: {group or ''}"
     try:
-        parsed = _json(call_llm(system, user, provider, model))
+        parsed = extract_json(call_llm(system, user, provider, model))
         out: list[str] = []
         for h in parsed.get("headings", []):
             digits = "".join(ch for ch in str(h) if ch.isdigit())[:4]
@@ -160,7 +125,7 @@ def assign_code(
             f'{c["code"]}: {c["description"]}' for c in cands
         )
         raw = call_llm(system, user, provider, model)
-        parsed = _json(raw)
+        parsed = extract_json(raw)
         parsed_code = str(parsed.get("code", ""))
         valid = parsed_code in codes
         chosen = parsed_code if valid else str(cands[0].get("code", ""))
