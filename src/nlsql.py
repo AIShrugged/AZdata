@@ -6,6 +6,7 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.request
 from decimal import Decimal
 from pathlib import Path
@@ -23,16 +24,24 @@ OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 ROW_LIMIT = int(os.environ.get("AZDATA_ROW_LIMIT", "1000"))
 STMT_TIMEOUT_MS = int(os.environ.get("AZDATA_STATEMENT_TIMEOUT_MS", "5000"))
 LLM_TIMEOUT = int(os.environ.get("AZDATA_LLM_TIMEOUT", "120"))
+AZDATA_LLM_RETRIES = int(os.environ.get("AZDATA_LLM_RETRIES", "3"))
 # Reasoning-capable local models (e.g. qwen3.5) burn minutes "thinking" for simple SQL; off by default.
 OLLAMA_THINK = os.environ.get("AZDATA_LLM_THINK", "false").strip().lower() in ("1", "true", "yes", "on")
 DSN = f"host={os.environ.get('PGHOST') or '/tmp'} port={os.environ.get('PGPORT') or '5432'} dbname={os.environ.get('PGDATABASE') or 'azdata'}"
 DEFAULT_MODELS = {"ollama": "qwen3.5:latest", "openai": "gpt-5.5", "anthropic": "claude-opus-4-8", "openrouter": "qwen/qwen3.5-122b-a10b"}
 MODEL_ENV = os.environ.get("AZDATA_LLM_MODEL")
 MODEL = MODEL_ENV or DEFAULT_MODELS.get(PROVIDER, DEFAULT_MODELS["ollama"])
+_CATALOG_CACHE: dict[str, Any] = {}
 
 
 class GuardError(Exception):
     pass
+
+
+def cached_catalog() -> dict[str, Any]:
+    if "catalog" not in _CATALOG_CACHE:
+        _CATALOG_CACHE["catalog"] = build_catalog()
+    return _CATALOG_CACHE["catalog"]
 
 
 def reference_date(conn: Any) -> dt.date:
@@ -90,6 +99,20 @@ SQL: SELECT sum(vat_amount) AS total_vat FROM einvoice WHERE supplier_tin = 'A_0
     return system, question
 
 
+def _with_retries(fn, attempts=None):
+    attempts = attempts or AZDATA_LLM_RETRIES
+    last = None
+    for i in range(attempts):
+        try:
+            return fn()
+        except Exception as exc:  # transient: timeouts, 5xx, rate limits, conn errors
+            last = exc
+            if i == attempts - 1:
+                raise
+            time.sleep(min(2 ** i, 8))
+    raise last
+
+
 def call_llm(system: str, user: str, provider: str, model: str) -> str:
     provider = provider.lower()
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
@@ -102,29 +125,32 @@ def call_llm(system: str, user: str, provider: str, model: str) -> str:
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=LLM_TIMEOUT) as resp:
-            body = json.loads(resp.read().decode("utf-8"))
+        def request() -> dict[str, Any]:
+            with urllib.request.urlopen(req, timeout=LLM_TIMEOUT) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+
+        body = _with_retries(request)
         return str(body["message"]["content"])
     if provider == "openai":
         import openai
 
         client = openai.OpenAI()
-        resp = client.chat.completions.create(model=model, messages=messages, temperature=0)
+        resp = _with_retries(lambda: client.chat.completions.create(model=model, messages=messages, temperature=0))
         return str(resp.choices[0].message.content)
     if provider == "openrouter":
         import openai
 
         client = openai.OpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.environ.get("OPENROUTER_API_KEY"), timeout=LLM_TIMEOUT)
-        resp = client.chat.completions.create(
+        resp = _with_retries(lambda: client.chat.completions.create(
             model=model, messages=messages, temperature=0,
             extra_body={"reasoning": {"enabled": OLLAMA_THINK}},  # OLLAMA_THINK defaults false -> no runaway thinking
-        )
+        ))
         return str(resp.choices[0].message.content)
     if provider == "anthropic":
         import anthropic
 
         client = anthropic.Anthropic()
-        resp = client.messages.create(model=model, max_tokens=1024, system=system, messages=[{"role": "user", "content": user}], temperature=0)
+        resp = _with_retries(lambda: client.messages.create(model=model, max_tokens=1024, system=system, messages=[{"role": "user", "content": user}], temperature=0))
         return str(resp.content[0].text)
     raise ValueError(f"Unsupported provider: {provider}")
 
@@ -279,7 +305,7 @@ def answer(
     parsed_ref = dt.date.fromisoformat(ref_date) if isinstance(ref_date, str) else ref_date
     result = _base_result(question, provider, chosen_model, parsed_ref)
     try:
-        catalog = build_catalog()
+        catalog = cached_catalog()
         if parsed_ref is None:
             conn = psycopg2.connect(DSN)
             try:

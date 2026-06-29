@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from collections import OrderedDict
 import json
+import logging
 import os
 import sys
+import time
 from pathlib import Path
 from typing import Any, Optional
 
@@ -17,6 +20,26 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from catalog import build_catalog
 from nlsql import PROVIDER as DEFAULT_PROVIDER, answer
 import rag, eqm, router
+
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger("azdata")
+_CACHE_MAX = int(os.environ.get("AZDATA_CACHE_MAX", "1024"))
+_query_cache: "OrderedDict[tuple, Any]" = OrderedDict()
+_classify_cache: "OrderedDict[tuple, Any]" = OrderedDict()
+
+
+def _cache_get(cache, key):
+    if key in cache:
+        cache.move_to_end(key)
+        return cache[key]
+    return None
+
+
+def _cache_put(cache, key, value):
+    cache[key] = value
+    cache.move_to_end(key)
+    while len(cache) > _CACHE_MAX:
+        cache.popitem(last=False)
 
 
 app = FastAPI(title="AZdata e-invoice AI", version="0.2.0")
@@ -81,12 +104,27 @@ def catalog() -> dict[str, Any]:
 
 @app.post("/query")
 def query(req: QueryRequest) -> Any:
+    start = time.time()
+    provider = req.provider or DEFAULT_PROVIDER
+    key = (req.question, provider, req.model, req.ref_date)
+    cached = _cache_get(_query_cache, key)
+    if cached is not None and not cached.get("error"):
+        result = dict(cached)
+        result["cached"] = True
+        ms = int((time.time() - start) * 1000)
+        log.info("query question=%r latency_ms=%d cache=%s provider=%s", req.question[:60], ms, "hit", provider)
+        return result
+
     result = answer(
         req.question,
-        provider=req.provider or DEFAULT_PROVIDER,
+        provider=provider,
         model=req.model,
         ref_date=req.ref_date,
     )
+    if not result.get("error"):
+        _cache_put(_query_cache, key, result)
+    ms = int((time.time() - start) * 1000)
+    log.info("query question=%r latency_ms=%d cache=%s provider=%s", req.question[:60], ms, "miss", provider)
     if result.get("error"):
         return JSONResponse(status_code=400, content=result)
     return result
@@ -94,7 +132,19 @@ def query(req: QueryRequest) -> Any:
 
 @app.post("/classify")
 def classify(req: ClassifyRequest) -> Any:
+    start = time.time()
+    key = (req.text, req.threshold, req.local_model, req.strong_model, req.assign_hs)
+    cached = _cache_get(_classify_cache, key)
+    if cached is not None and not cached.get("error"):
+        result = dict(cached)
+        result["cached"] = True
+        ms = int((time.time() - start) * 1000)
+        log.info("classify text=%r latency_ms=%d cache=%s tier=%s escalated=%s", req.text[:60], ms, "hit", result.get("tier"), result.get("escalated"))
+        return result
+
     if not TASK2_READY:
+        ms = int((time.time() - start) * 1000)
+        log.info("classify text=%r latency_ms=%d cache=%s tier=%s escalated=%s", req.text[:60], ms, "miss", None, None)
         raise HTTPException(
             status_code=503,
             detail=(
@@ -110,7 +160,7 @@ def classify(req: ClassifyRequest) -> Any:
     if req.strong_model is not None:
         route_kwargs["strong_model"] = req.strong_model
     try:
-        return router.classify_item(
+        result = router.classify_item(
             req.text,
             RAG_EMB,
             RAG_META,
@@ -120,8 +170,16 @@ def classify(req: ClassifyRequest) -> Any:
             assign_hs=req.assign_hs,
             **route_kwargs,
         )
+        if not result.get("error"):
+            _cache_put(_classify_cache, key, result)
+        ms = int((time.time() - start) * 1000)
+        log.info("classify text=%r latency_ms=%d cache=%s tier=%s escalated=%s", req.text[:60], ms, "miss", result.get("tier"), result.get("escalated"))
+        return result
     except Exception as exc:
-        return JSONResponse(status_code=400, content={"error": str(exc)})
+        result = {"error": str(exc)}
+        ms = int((time.time() - start) * 1000)
+        log.info("classify text=%r latency_ms=%d cache=%s tier=%s escalated=%s", req.text[:60], ms, "miss", result.get("tier"), result.get("escalated"))
+        return JSONResponse(status_code=400, content=result)
 
 
 @app.get("/evals")
