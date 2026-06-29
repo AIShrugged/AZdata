@@ -72,7 +72,7 @@ def retrieve_codes(item_text: str, emb: np.ndarray, meta: list[dict[str, Any]], 
 def predict_headings(item_text: str, group: Optional[str], provider: str, model: Optional[str]) -> list[str]:
     system = (
         "You are an HS (Harmonized System) customs classification expert. Given an Azerbaijani "
-        "product name and its category, output the 1-3 most likely 4-digit HS headings (chapter+heading). "
+        "product name and its category, output the 4-6 most likely 4-digit HS headings (chapter+heading), best guess first."
         'Output ONLY JSON: {"headings": ["NNNN", ...]}. Use your HS knowledge.'
     )
     user = f"PRODUCT: {item_text}\nCATEGORY: {group or ''}"
@@ -88,11 +88,26 @@ def predict_headings(item_text: str, group: Optional[str], provider: str, model:
         return []
 
 
+def expand_query(item_text: str, provider: Optional[str], model: Optional[str]) -> str:
+    """Describe a (possibly brand/colloquial) product in generic category terms so it embeds near
+    the formal HS descriptions — bridges the item-name <-> description vocabulary gap."""
+    system = (
+        "You are an HS customs classification assistant. Given an Azerbaijani invoice product name "
+        "(which may be a brand, model, or colloquial name), describe in 1-2 lines WHAT THE PRODUCT IS "
+        "in generic category terms useful for customs classification: material, type, form, use, and "
+        "common synonyms (Azerbaijani/English/Russian). Do NOT output any code or number. Plain text only."
+    )
+    try:
+        return call_llm(system, f"PRODUCT: {item_text}", provider, model).strip()[:300]
+    except Exception:
+        return ""
+
+
 def assign_code(
     item_text: str,
     emb: np.ndarray,
     meta: list[dict[str, Any]],
-    k: int = 12,
+    k: int = 30,
     provider: Optional[str] = None,
     model: Optional[str] = None,
     group: Optional[str] = None,
@@ -101,27 +116,34 @@ def assign_code(
     model = model or DEFAULT_MODELS.get(provider)
     cands: list[dict[str, Any]] = []
     try:
-        headings = set(predict_headings(item_text, group, provider, model))  # LLM predicts HS heading
+        # Query expansion: describe the (possibly brand/colloquial) item in generic category terms
+        # so headings + embedding retrieval find it even with no shared vocabulary.
+        expanded = expand_query(item_text, provider, model)
+        queries = [item_text, expanded] if expanded else [item_text]
+        headings = set(predict_headings(expanded or item_text, group, provider, model))
         if headings:
-            cands = [c for c in meta if str(c.get("code", ""))[:4] in headings][:40]
-        # ALWAYS union with embedding retrieval so a single wrong predicted heading cannot
-        # drop the true code from the candidate pool (was: embedding fallback only when empty).
+            cands = [c for c in meta if str(c.get("code", ""))[:4] in headings][:50]
+        # ALWAYS union with embedding retrieval over BOTH the raw item and its expansion, so a
+        # single wrong predicted heading cannot drop the true code from the candidate pool.
         seen = {str(c.get("code", "")) for c in cands}
-        for c in retrieve_codes(item_text, emb, meta, k):
-            code = str(c.get("code", ""))
-            if code not in seen:
-                cands.append(c)
-                seen.add(code)
+        for q in queries:
+            for c in retrieve_codes(q, emb, meta, k):
+                code = str(c.get("code", ""))
+                if code not in seen:
+                    cands.append(c)
+                    seen.add(code)
         if not cands:
             raise ValueError("no candidates retrieved")
+        what = f"\nWHAT IT IS: {expanded}" if expanded else ""
         codes = {str(c.get("code", "")): c for c in cands}
         system = (
-            "You map an Azerbaijani product to its single best HS commodity code from the given candidate list. "
-            "Choose the code whose description best matches the product. Output ONLY one JSON object: "
-            '{"code": "<one of the candidate codes>", "confidence": <0..1>}. '
+            "You are an HS customs expert. First decide what the product fundamentally IS "
+            "(material / type / form / use), then choose from the candidate list the single code whose "
+            "description best matches that CATEGORY — base it on meaning, not surface word overlap. "
+            'Output ONLY one JSON object: {"code": "<one of the candidate codes>", "confidence": <0..1>}. '
             "The code MUST be exactly one of the candidates."
         )
-        user = "PRODUCT: " + item_text + "\n\nCANDIDATES:\n" + "\n".join(
+        user = "PRODUCT: " + item_text + what + "\n\nCANDIDATES:\n" + "\n".join(
             f'{c["code"]}: {c["description"]}' for c in cands
         )
         raw = call_llm(system, user, provider, model)
