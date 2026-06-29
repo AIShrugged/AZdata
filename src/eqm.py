@@ -29,20 +29,24 @@ def _trunc(text: str, n: int) -> str:
 
 def build_eqm_index() -> None:
     rows = _read_csv(EQM_CSV)
+    kw_path = ROOT / "data/processed/eqm_keywords.json"
+    keywords = json.load(open(kw_path, encoding="utf-8")) if kw_path.exists() else {}
     meta: list[dict[str, Any]] = []
-    descriptions: list[str] = []
+    texts: list[str] = []  # text to EMBED = description + enrichment keywords (brands/synonyms)
     for row in rows:
         if str(row.get("active", "")).strip().lower() not in {"true", "1", "t", "yes"}:
             continue
-        item = {"code": _clean(row.get("code")), "description": _clean(row.get("description")), "unit": _clean(row.get("unit"))}
-        meta.append(item)
-        descriptions.append(item["description"])
+        code = _clean(row.get("code"))
+        desc = _clean(row.get("description"))
+        meta.append({"code": code, "description": desc, "unit": _clean(row.get("unit"))})
+        kw = str(keywords.get(code, "")).strip()
+        texts.append(f"{desc} | {kw}" if kw else desc)
 
-    emb = embed_texts(descriptions, batch=64).astype("float32")
+    emb = embed_texts(texts, batch=64).astype("float32")
     np.save(str(INDEX_PREFIX) + ".npy", emb)
     with open(str(INDEX_PREFIX) + ".meta.json", "w", encoding="utf-8") as fh: json.dump(meta, fh, ensure_ascii=False, indent=2)
     dim = int(emb.shape[1]) if emb.ndim == 2 and emb.shape[0] else 0
-    print(f"indexed {len(meta)} active codes, dim {dim}")
+    print(f"indexed {len(meta)} active codes ({len(keywords)} enriched), dim {dim}")
 
 
 def load_eqm_index() -> tuple[np.ndarray, list[dict[str, Any]]]:

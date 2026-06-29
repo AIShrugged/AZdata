@@ -42,3 +42,6 @@ data/review_queue.db
 data/processed/corrections.csv
 data/processed/synthetic_catalog.csv
 data/processed/taxonomy_synth.csv
+data/processed/dev_hard.csv
+data/processed/test_hard.csv
+data/processed/eqm_keywords.json
