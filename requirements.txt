@@ -1,0 +1,12 @@
+pandas
+openpyxl
+xlrd
+psycopg2-binary
+pyyaml
+sqlglot
+numpy
+fastapi
+uvicorn
+httpx
+openai
+pytest
