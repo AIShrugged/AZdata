@@ -1,0 +1,35 @@
+# Local AI-tooling / state (Ruflo, Claude-Flow, Codex) — not part of the project
+.claude/
+.claude-flow/
+.swarm/
+ruvector.db
+.mcp.json
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Secrets — API keys live OUTSIDE the repo (~/.config/azdata/). Never commit any.
+*.key
+.env
+.env.*
+
+# Large / derived data artifacts — regenerate with the scripts (see README "Setup")
+data/processed/*.npy
+data/processed/*.meta.json
+data/processed/labeled_items.csv
+data/processed/eqm_registry.csv
+data/processed/train.csv
+data/processed/dev.csv
+data/processed/test.csv
+data/processed/eval_results*.csv
+data/processed/eval_smoke*.csv
+data/processed/mis_*.json
+data/processed/eval_texts.json
+data/processed/eval_pred_codex.json
+
+# Logs
+*.log
