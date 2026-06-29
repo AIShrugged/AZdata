@@ -24,6 +24,8 @@ else bad "bge-m3 missing — run: ollama pull bge-m3"; exit 1; fi
 
 if [ -s "$KEY" ]; then ok "OpenRouter key present"; export OPENROUTER_API_KEY="$(cat "$KEY")"
 else bad "OpenRouter key missing at $KEY"; exit 1; fi
+# demo: show SQL + detailed errors (production leaves this false)
+export AZDATA_DEBUG=true
 
 [ -f "$ROOT/data/processed/train_index.npy" ] || { bad "RAG index missing — run: $PY $ROOT/src/rag.py --build"; exit 1; }
 [ -f "$ROOT/data/processed/eqm_index.npy" ]   || { bad "EQM index missing — run: $PY $ROOT/src/eqm.py --build"; exit 1; }
