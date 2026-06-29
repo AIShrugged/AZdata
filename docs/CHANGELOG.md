@@ -2,6 +2,15 @@
 
 All notable decisions and changes. Newest first. Dates absolute.
 
+## 2026-06-29
+### Shared & hardened
+- **Published to GitHub:** `AIShrugged/AZdata` (private) — full code + docs. Added comprehensive `README.md` and `docs/ARCHITECTURE.md` (every module + process explained), plus `.gitignore` and `requirements.txt`; untracked local AI-tooling config.
+- **Performance:** cached the catalog (`nlsql.cached_catalog()` — was rebuilt on every `/query`); bounded LRU caches for `/query` + `/classify` (temperature-0 deterministic) → repeated requests in ~ms (`/query` 1.07s → 0.004s on cache hit).
+- **Reliability:** `call_llm` wraps every provider call in `_with_retries` (exponential backoff) for transient failures.
+- **Observability:** structured per-request logging (latency, cache hit/miss, tier/escalated).
+- **CI & tests:** `.github/workflows/ci.yml` runs **12 deterministic unit tests** (`tests/test_unit.py`: SQL guard, catalog parsing, classifier normalize/extract, EQM clean, RAG numerics — no DB/LLM) on every push; CI green.
+- **Code audit:** multi-agent audit workflow over the whole repo (6 dimensions, every finding adversarially verified) → `docs/AUDIT.md`.
+
 ## 2026-06-28
 ### Built (Product & demo)
 - **Unified API + web app:** `src/api.py` serves `/query` (Task 1), `/classify` (Task 2 full pipeline), `/evals`, `/catalog`, `/health`, and the `web/` UI. `web/index.html` — **4 tabs** (NL Query, Classify, Evals, Report) with one-click example chips, a Copy-SQL button, and an SVG model-comparison chart. Dedicated port **8642** (8000=gemhunter, 8137=Agentic-OS are other projects on the machine).
