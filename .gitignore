@@ -40,3 +40,4 @@ data/processed/clean_eval_*.json
 data/processed/eval_clean_*.json
 data/review_queue.db
 data/processed/corrections.csv
+data/processed/synthetic_catalog.csv
