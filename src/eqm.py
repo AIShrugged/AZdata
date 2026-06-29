@@ -111,7 +111,7 @@ def assign_code(
     item_text: str,
     emb: np.ndarray,
     meta: list[dict[str, Any]],
-    k: int = 30,
+    k: int = 60,
     provider: Optional[str] = None,
     model: Optional[str] = None,
     group: Optional[str] = None,

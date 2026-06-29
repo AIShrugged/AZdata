@@ -23,6 +23,7 @@ def main() -> None:
     ap.add_argument("--provider", default="openrouter")
     ap.add_argument("--model", default="qwen/qwen3.5-122b-a10b")
     ap.add_argument("--workers", type=int, default=8)
+    ap.add_argument("--k", type=int, default=30)
     ap.add_argument("--limit", type=int, default=0)
     a = ap.parse_args()
 
@@ -32,7 +33,7 @@ def main() -> None:
         rows = rows[: a.limit]
 
     def run(r):
-        res = eqm.assign_code(r["text"], emb, meta, provider=a.provider, model=a.model)
+        res = eqm.assign_code(r["text"], emb, meta, k=a.k, provider=a.provider, model=a.model)
         pred = "".join(c for c in str(res.get("code", "")) if c.isdigit())
         cands = {str(c)[:4] for c in res.get("candidates", [])}
         return r, pred, cands
