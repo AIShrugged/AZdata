@@ -70,11 +70,17 @@ def prompt(seed: dict, quality: str, n: int) -> tuple[str, str]:
         how = ("realistic Azerbaijani e-invoice line items a business would actually enter for goods in "
                "THIS category — real product names, brands, sizes/units, as on a real invoice (NOT the "
                "official wording)")
-    else:
+    elif quality == "noisy":
         how = ("DEGRADED, messy versions as they appear in low-quality real invoices: heavy abbreviations, "
                "truncations, typos, missing Azerbaijani diacritics (ə→e, ş→s, ç→c), missing units, random "
                "ALL-CAPS or no-caps, OCR-like errors (O↔0, l↔1), partial/truncated names — still the "
                "SAME category. Do NOT include any HS code, catalogue number, or long digit string.")
+    else:  # hard — SEMANTIC mismatch, stresses retrieval
+        how = ("realistic items that DELIBERATELY do NOT share vocabulary with the official description — "
+               "use BRAND names, trade names, model numbers, and colloquial product names a business "
+               "actually types (e.g. 'Coca-Cola 0.5L' for carbonated drinks, 'MacBook Air M2' for laptops, "
+               "'Holcim M400' for cement), so the wording does NOT lexically match the formal category. "
+               "They must STILL genuinely belong to THIS category. No HS codes or long digit strings.")
     system = (
         f"You are given an Azerbaijani customs HS category (code + official description). Write {n} {how}. "
         "Output ONLY a JSON array of strings, nothing else."
@@ -97,7 +103,7 @@ def parse_strings(raw: str) -> list[str]:
 def generate(args) -> list[dict]:
     rows = _active(list(csv.DictReader(open(REGISTRY, encoding="utf-8"))))
     seeds = stratified_seeds(rows, args.seeds, random.Random(7))
-    qualities = ["clean", "noisy"] if args.quality == "both" else [args.quality]
+    qualities = {"both": ["clean", "noisy"], "all": ["clean", "noisy", "hard"]}.get(args.quality, [args.quality])
     per_q = max(1, args.variants // len(qualities))
     chapters = len({str(s["code"])[:2] for s in seeds})
     print(f"{len(seeds)} seed categories across {chapters} HS chapters × {qualities} × {per_q} → ~{len(seeds)*per_q*len(qualities)}", file=sys.stderr)
@@ -141,6 +147,7 @@ def evaluate(rows: list[dict], args) -> None:
         return r, pred, cands
 
     agg = collections.defaultdict(lambda: collections.Counter())
+    ch_agg = collections.defaultdict(lambda: [0, 0])  # chapter → [heading-correct, total]
     with ThreadPoolExecutor(max_workers=args.workers) as ex:
         for r, pred, cands in ex.map(run, sample):
             q = r["quality"]
@@ -149,19 +156,24 @@ def evaluate(rows: list[dict], args) -> None:
             agg[q]["heading"] += pred[:4] == r["heading"]
             agg[q]["chapter"] += pred[:2] == r["chapter"]
             agg[q]["recall"] += r["heading"] in cands
+            ch_agg[r["chapter"]][1] += 1
+            ch_agg[r["chapter"]][0] += pred[:4] == r["heading"]
 
     print("\n=== full-taxonomy eval (EQM category engine, across ALL categories) ===")
     print(f"  {'quality':8} {'exact':>7} {'heading':>8} {'chapter':>8} {'recall@k':>9}  (n)")
     for q in sorted(agg):
         a = agg[q]; n = a["n"] or 1
         print(f"  {q:8} {100*a['exact']/n:6.1f}% {100*a['heading']/n:7.1f}% {100*a['chapter']/n:7.1f}% {100*a['recall']/n:8.1f}%  ({a['n']})")
+    worst = sorted(((c, v[0] / v[1], v[1]) for c, v in ch_agg.items() if v[1] >= 3), key=lambda x: x[1])[:6]
+    if worst:
+        print("  weakest HS chapters (heading acc, n>=3): " + ", ".join(f"ch{c} {100*a:.0f}%(n{n})" for c, a, n in worst))
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--seeds", type=int, default=250, help="seed categories (stratified across chapters)")
     ap.add_argument("--variants", type=int, default=20, help="items per seed (split across quality tiers)")
-    ap.add_argument("--quality", choices=["clean", "noisy", "both"], default="both")
+    ap.add_argument("--quality", choices=["clean", "noisy", "hard", "both", "all"], default="both")
     ap.add_argument("--provider", default="openrouter")
     ap.add_argument("--model", default="qwen/qwen3.5-122b-a10b")
     ap.add_argument("--workers", type=int, default=8)
