@@ -92,6 +92,7 @@ def classify_item(
 ) -> dict[str, Any]:
     c = classify_route(item_text, rag_emb, rag_meta, instructions, **route_kwargs)
     hs_code = hs_desc = None
+    hs_review = False
     # Skip HS for review-bound items (out-of-taxonomy / low confidence): the code would be
     # unreliable and a human decides the item anyway.
     if c["label"] == "Good" and assign_hs and not c.get("needs_review"):
@@ -104,6 +105,7 @@ def classify_item(
             model=route_kwargs.get("strong_model", STRONG_MODEL),
         )
         hs_code, hs_desc = hs.get("code"), hs.get("description")
+        hs_review = bool(hs.get("needs_review"))  # low-confidence HS code → flag the item for review
     out = {
         "item": item_text,
         "label": c["label"],
@@ -111,7 +113,7 @@ def classify_item(
         "hs_code": hs_code,
         "hs_description": hs_desc,
         "is_mixed": c.get("is_mixed", False),
-        "needs_review": c.get("needs_review", False),
+        "needs_review": c.get("needs_review", False) or hs_review,
         "components": c.get("components", []),
         "tier": c["tier"],
         "escalated": c["escalated"],

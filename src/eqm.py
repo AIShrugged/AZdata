@@ -138,8 +138,12 @@ def assign_code(
         codes = {str(c.get("code", "")): c for c in cands}
         system = (
             "You are an HS customs expert. First decide what the product fundamentally IS "
-            "(material / type / form / use), then choose from the candidate list the single code whose "
-            "description best matches that CATEGORY — base it on meaning, not surface word overlap. "
+            "(material / type / form / use). Use COMMON SENSE and the item's UNIT as a sanity check: "
+            "'q'/'kq' = grams/kilograms and 'l' = litres mean a physical good measured by weight/volume "
+            "(food, material) — NOT machinery, pumps, or equipment; 'ədəd' = pieces. Then choose from the "
+            "candidate list the single code whose description best matches that category — by meaning, not "
+            "surface words. If NONE of the candidates plausibly fit, pick the closest BROADER match and set "
+            "confidence below 0.35. Be honest — give a LOW confidence when the candidates are a poor fit. "
             'Output ONLY one JSON object: {"code": "<one of the candidate codes>", "confidence": <0..1>}. '
             "The code MUST be exactly one of the candidates."
         )
@@ -155,8 +159,14 @@ def assign_code(
         # Confidence must describe the code actually returned: parse defensively (a non-numeric
         # value like "high" no longer aborts the whole result) and zero it when we fell back to cands[0].
         confidence = _normalize_confidence(parsed.get("confidence")) if valid else 0.0
+        # Honest back-off: low confidence → flag for human review + report the broader level we DO
+        # trust (heading) instead of a confident-but-wrong 10-digit guess.
+        needs_review = confidence < 0.5
+        granularity = "code" if confidence >= 0.5 else ("heading" if confidence >= 0.3 else "chapter")
         return {"code": chosen, "description": _clean(chosen_row.get("description")),
                 "confidence": confidence, "code_substituted": not valid,
+                "needs_review": needs_review, "granularity": granularity,
+                "heading": str(chosen)[:4], "chapter": str(chosen)[:2],
                 "candidates": [str(c.get("code", "")) for c in cands], "ok": True}
     except Exception as exc:
         top = cands[0] if cands else {}
