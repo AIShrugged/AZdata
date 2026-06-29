@@ -6,6 +6,7 @@ from typing import Any, Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from rag import embed_texts, _l2norm
 from nlsql import call_llm, DEFAULT_MODELS, PROVIDER as DEFAULT_PROVIDER
+from classify import _normalize_confidence
 
 import numpy as np, json, csv, os, re, argparse
 
@@ -138,8 +139,14 @@ def assign_code(
         headings = set(predict_headings(item_text, group, provider, model))  # LLM predicts HS heading
         if headings:
             cands = [c for c in meta if str(c.get("code", ""))[:4] in headings][:40]
-        if not cands:  # fall back to pure embedding retrieval
-            cands = retrieve_codes(item_text, emb, meta, k)
+        # ALWAYS union with embedding retrieval so a single wrong predicted heading cannot
+        # drop the true code from the candidate pool (was: embedding fallback only when empty).
+        seen = {str(c.get("code", "")) for c in cands}
+        for c in retrieve_codes(item_text, emb, meta, k):
+            code = str(c.get("code", ""))
+            if code not in seen:
+                cands.append(c)
+                seen.add(code)
         if not cands:
             raise ValueError("no candidates retrieved")
         codes = {str(c.get("code", "")): c for c in cands}
@@ -155,10 +162,14 @@ def assign_code(
         raw = call_llm(system, user, provider, model)
         parsed = _json(raw)
         parsed_code = str(parsed.get("code", ""))
-        chosen = parsed_code if parsed_code in codes else str(cands[0].get("code", ""))
+        valid = parsed_code in codes
+        chosen = parsed_code if valid else str(cands[0].get("code", ""))
         chosen_row = codes.get(chosen, {})
+        # Confidence must describe the code actually returned: parse defensively (a non-numeric
+        # value like "high" no longer aborts the whole result) and zero it when we fell back to cands[0].
+        confidence = _normalize_confidence(parsed.get("confidence")) if valid else 0.0
         return {"code": chosen, "description": _clean(chosen_row.get("description")),
-                "confidence": float(parsed.get("confidence", 0) or 0),
+                "confidence": confidence, "code_substituted": not valid,
                 "candidates": [str(c.get("code", "")) for c in cands], "ok": True}
     except Exception as exc:
         top = cands[0] if cands else {}

@@ -77,7 +77,14 @@ def format_error(error: Error) -> str:
 class Optimizer:
     def __init__(self, args: argparse.Namespace) -> None:
         self.args = args
-        self.sample_rows = load_dev_sample(args.sample)
+        sample = load_dev_sample(args.sample)
+        # Disjoint split: FEEDBACK drives the prompt rewrites; VALIDATION (held out) selects the
+        # winner — so reported gains are not in-sample / overfit to the proposer's own error set.
+        rng = random.Random(7)
+        rng.shuffle(sample)
+        mid = len(sample) // 2
+        self.feedback_rows = sample[:mid]
+        self.val_rows = sample[mid:]
         self.emb, self.meta = R.load_index(ROOT / "data/processed/train_index")
 
     def classify_one(self, row: Row, instructions: str) -> dict[str, object]:
@@ -91,22 +98,22 @@ class Optimizer:
             instructions=instructions,
         )
 
-    def evaluate(self, instructions: str) -> tuple[float, list[Error]]:
-        if not self.sample_rows:
+    def evaluate(self, instructions: str, rows: list[Row]) -> tuple[float, list[Error]]:
+        if not rows:
             return 0.0, []
 
-        predictions: list[object] = [None] * len(self.sample_rows)
+        predictions: list[object] = [None] * len(rows)
         with ThreadPoolExecutor(max_workers=self.args.workers) as pool:
             futures = {
                 pool.submit(self.classify_one, row, instructions): idx
-                for idx, row in enumerate(self.sample_rows)
+                for idx, row in enumerate(rows)
             }
             for future in as_completed(futures):
                 predictions[futures[future]] = future.result()
 
         correct = 0
         errors: list[Error] = []
-        for row, pred in zip(self.sample_rows, predictions):
+        for row, pred in zip(rows, predictions):
             predicted = pred if isinstance(pred, dict) else {"label": None, "group": None}
             if is_fully_correct(row, predicted):
                 correct += 1
@@ -120,7 +127,7 @@ class Optimizer:
                         "pred_group": str(predicted.get("group")) if predicted.get("group") is not None else None,
                     }
                 )
-        return 100.0 * correct / len(self.sample_rows), errors
+        return 100.0 * correct / len(rows), errors
 
     def propose(self, current_instructions: str, errors: list[Error]) -> str:
         system = (
@@ -150,24 +157,27 @@ def main() -> None:
     optimizer = Optimizer(args)
 
     started = time.time()
+    MARGIN = 0.5  # a candidate must beat the incumbent by >0.5pt on held-out validation to be kept
     best_instr = R.DEFAULT_INSTRUCTIONS
-    best_acc, best_errors = optimizer.evaluate(best_instr)
-    print(f"baseline: {best_acc:.1f}%")
+    _, best_errors = optimizer.evaluate(best_instr, optimizer.feedback_rows)   # errors drive the proposals
+    best_val, _ = optimizer.evaluate(best_instr, optimizer.val_rows)           # held-out selection score
+    print(f"baseline: val {best_val:.1f}% (held-out, n={len(optimizer.val_rows)})")
 
-    history: list[tuple[str, float]] = [("baseline", best_acc)]
+    history: list[tuple[str, float]] = [("baseline", best_val)]
     for round_no in range(1, args.rounds + 1):
         cand = optimizer.propose(best_instr, best_errors)
-        cand_acc, cand_errors = optimizer.evaluate(cand)
-        print(f"round {round_no}: {cand_acc:.1f}%  (best {best_acc:.1f}%)")
-        if cand_acc > best_acc:
-            best_instr, best_acc, best_errors = cand, cand_acc, cand_errors
+        cand_val, _ = optimizer.evaluate(cand, optimizer.val_rows)             # SELECT on held-out only
+        print(f"round {round_no}: val {cand_val:.1f}%  (best {best_val:.1f}%)")
+        if cand_val > best_val + MARGIN:
+            _, best_errors = optimizer.evaluate(cand, optimizer.feedback_rows)  # refresh feedback errors
+            best_instr, best_val = cand, cand_val
             print("  -> kept")
         else:
-            print("  -> reverted")
-        history.append((f"round{round_no}", cand_acc))
+            print("  -> reverted (gain below margin)")
+        history.append((f"round{round_no}", cand_val))
 
     print("history: " + json.dumps(history, ensure_ascii=False))
-    print(f"best: {best_acc:.1f}%")
+    print(f"best (held-out val): {best_val:.1f}%  — confirm the final number on TEST via scripts/eval_clean.py")
     print(f"elapsed: {time.time() - started:.1f}s")
     with open(ROOT / "data/processed/best_instructions.txt", "w", encoding="utf-8") as fh:
         fh.write(best_instr)
