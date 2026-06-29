@@ -41,3 +41,4 @@ data/processed/eval_clean_*.json
 data/review_queue.db
 data/processed/corrections.csv
 data/processed/synthetic_catalog.csv
+data/processed/taxonomy_synth.csv
