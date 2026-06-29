@@ -12,6 +12,7 @@ LOCAL_MODEL = "qwen/qwen3.5-35b-a3b"
 STRONG_MODEL = "qwen/qwen3.5-122b-a10b"
 K = 16
 THRESHOLD = 0.9
+REVIEW_THRESHOLD = 0.6  # final confidence below this (or group OTHER / model-flagged) → human review
 
 
 def load_instructions() -> Optional[str]:
@@ -56,10 +57,20 @@ def classify_route(
             chosen, tier, escalated = strong, "strong", True
         else:
             chosen, tier, escalated = local, "local", True
+    conf = float(chosen.get("confidence") or 0.0)
+    needs_review = (
+        bool(chosen.get("needs_review"))                          # model flagged it
+        or chosen.get("group") == "OTHER"                         # out-of-taxonomy good
+        or (bool(chosen.get("ok")) and conf < REVIEW_THRESHOLD)   # low confidence after routing
+        or not chosen.get("ok")                                   # parse / total failure
+    )
     result = {
         "label": chosen.get("label"),
         "group": chosen.get("group"),
         "confidence": chosen.get("confidence"),
+        "is_mixed": bool(chosen.get("is_mixed")),
+        "needs_review": needs_review,
+        "components": chosen.get("components") or [],
         "tier": tier,
         "escalated": escalated,
         "local_confidence": local.get("confidence"),
@@ -81,7 +92,9 @@ def classify_item(
 ) -> dict[str, Any]:
     c = classify_route(item_text, rag_emb, rag_meta, instructions, **route_kwargs)
     hs_code = hs_desc = None
-    if c["label"] == "Good" and assign_hs:
+    # Skip HS for review-bound items (out-of-taxonomy / low confidence): the code would be
+    # unreliable and a human decides the item anyway.
+    if c["label"] == "Good" and assign_hs and not c.get("needs_review"):
         hs = eqm.assign_code(
             item_text,
             eqm_emb,
@@ -97,6 +110,9 @@ def classify_item(
         "group": c["group"],
         "hs_code": hs_code,
         "hs_description": hs_desc,
+        "is_mixed": c.get("is_mixed", False),
+        "needs_review": c.get("needs_review", False),
+        "components": c.get("components", []),
         "tier": c["tier"],
         "escalated": c["escalated"],
         "confidence": c["confidence"],

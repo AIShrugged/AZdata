@@ -105,6 +105,20 @@ DEFAULT_INSTRUCTIONS = (
 )
 
 
+POLICY = (
+    "\n\nSpecial cases & FINAL output schema (these override any conflicting format above):\n"
+    "- MIXED line — a physical good bundled with an ancillary service (delivery/çatdırılma, "
+    "installation/quraşdırma): apply the PRIMARY-COMPONENT rule — the principal GOOD wins and the "
+    'ancillary service follows it. Set label="Good", group=the good\'s group, is_mixed=true, and list components.\n'
+    '- A GOOD that fits NONE of the 7 groups above: set group="OTHER".\n'
+    "- If you are NOT confident — unclear, garbled, a non-item/placeholder, or genuinely ambiguous — "
+    "set needs_review=true (still give your best label/group, using OTHER if no group fits).\n"
+    'Output ONLY one JSON object: {"label":"Good"|"Service","group":<one of the 7 groups | "OTHER" | null>,'
+    '"confidence":<0..1>,"is_mixed":<true|false>,"needs_review":<true|false>,'
+    '"components":[{"part":"...","kind":"Good"|"Service"}]}  (include components only when is_mixed is true).'
+)
+
+
 def build_rag_prompt(text: str, examples: list[dict[str, Any]], instructions: Optional[str] = None) -> tuple[str, str]:
     base = instructions if instructions is not None else DEFAULT_INSTRUCTIONS
     group_lines = "\n".join(f"- {group}: {GROUP_HINTS[group]}" for group in GROUPS)
@@ -117,6 +131,7 @@ def build_rag_prompt(text: str, examples: list[dict[str, Any]], instructions: Op
         + f"\n\nProduct groups:\n{group_lines}\n\n"
         + "Similar labeled examples (item -> answer):\n"
         + "\n".join(example_lines)
+        + POLICY
     )
     return system, text
 
@@ -141,6 +156,9 @@ def classify_rag(
             "label": norm["label"],
             "group": norm["group"],
             "confidence": norm["confidence"],
+            "is_mixed": norm["is_mixed"],
+            "needs_review": norm["needs_review"],
+            "components": norm["components"],
             "ok": norm["label"] is not None,
             "provider": provider,
             "model": model,

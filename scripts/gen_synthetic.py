@@ -138,29 +138,31 @@ def evaluate(rows: list[dict], args) -> None:
     def classify(r):
         out = rag.classify_rag(r["text"], emb, meta, k=16, provider=args.provider,
                                model="qwen/qwen3.5-35b-a3b", instructions=instructions)
-        return r, (out.get("label") or ""), (out.get("group") or "")
+        return r, out
 
     results = []
     with ThreadPoolExecutor(max_workers=args.workers) as ex:
-        for r, pl, pg in ex.map(classify, rows):
-            results.append((r, pl, pg))
+        for r, out in ex.map(classify, rows):
+            results.append((r, out))
 
-    # In-domain (groups + service + mixed): correct = label matches, and for Goods the group matches.
-    def correct(r, pl, pg):
+    def abstained(out):
+        return bool(out.get("needs_review")) or out.get("group") == "OTHER"
+
+    def correct(r, out):
         if r["is_ood"]:
-            return pl == ""  # OOD "correct" only if the system abstained (it currently cannot) — measured separately
+            return abstained(out)  # correct = abstained instead of forcing a wrong group
         if r["label"] == "Service":
-            return pl == "Service"
-        return pl == "Good" and pg == r["group"]
+            return (out.get("label") or "") == "Service"
+        return (out.get("label") or "") == "Good" and (out.get("group") or "") == r["group"]
 
     by_diff: dict = {}
-    for r, pl, pg in results:
+    for r, out in results:
         if r["is_ood"]:
             continue
         d = r["difficulty"]
         by_diff.setdefault(d, [0, 0])
         by_diff[d][1] += 1
-        by_diff[d][0] += 1 if correct(r, pl, pg) else 0
+        by_diff[d][0] += 1 if correct(r, out) else 0
 
     print("\n=== synthetic eval (in-domain, primary-component gold) ===")
     for d in ("easy", "medium", "hard"):
@@ -168,19 +170,19 @@ def evaluate(rows: list[dict], args) -> None:
             c, n = by_diff[d]
             print(f"  {d:6}: {100*c/n:5.1f}%  ({c}/{n})")
 
-    mixed = [(r, pl, pg) for r, pl, pg in results if r["is_mixed"]]
+    mixed = [(r, out) for r, out in results if r["is_mixed"]]
     if mixed:
-        mc = sum(1 for r, pl, pg in mixed if pl == "Good" and pg == r["group"])
-        print(f"\n  MIXED (good+delivery → expect primary Good+group): {100*mc/len(mixed):.0f}% ({mc}/{len(mixed)})")
-        for r, pl, pg in mixed[:4]:
-            print(f"     {r['text'][:46]:46} → {pl}/{pg or '-'}  (gold Good/{r['group']})")
+        mc = sum(1 for r, out in mixed if (out.get("label") or "") == "Good" and (out.get("group") or "") == r["group"])
+        print(f"\n  MIXED (good+ancillary service → expect primary Good+group): {100*mc/len(mixed):.0f}% ({mc}/{len(mixed)})")
+        for r, out in mixed[:4]:
+            print(f"     {r['text'][:42]:42} → {out.get('label')}/{out.get('group') or '-'} mixed={out.get('is_mixed')} review={out.get('needs_review')}")
 
-    ood = [(r, pl, pg) for r, pl, pg in results if r["is_ood"]]
+    ood = [(r, out) for r, out in results if r["is_ood"]]
     if ood:
-        forced = sum(1 for r, pl, pg in ood if pl == "Good")
-        print(f"\n  OOD (not in 7 groups → SHOULD abstain): forced into a group {forced}/{len(ood)} (no abstain path yet)")
-        for r, pl, pg in ood[:4]:
-            print(f"     {r['text'][:46]:46} → {pl}/{pg or '-'}  (gold: OTHER/abstain)")
+        ab = sum(1 for r, out in ood if abstained(out))
+        print(f"\n  OOD (not in 7 groups → SHOULD abstain): abstained {ab}/{len(ood)}  (needs_review or group=OTHER)")
+        for r, out in ood[:4]:
+            print(f"     {r['text'][:42]:42} → {out.get('label')}/{out.get('group') or '-'} review={out.get('needs_review')}")
 
 
 def main() -> None:
@@ -191,7 +193,17 @@ def main() -> None:
     ap.add_argument("--model", default="qwen/qwen3.5-122b-a10b", help="generator model (use a strong one)")
     ap.add_argument("--workers", type=int, default=6)
     ap.add_argument("--eval", action="store_true", help="also classify the generated set and report")
+    ap.add_argument("--eval-only", action="store_true", help="skip generation; evaluate the existing synthetic.csv")
     args = ap.parse_args()
+
+    if args.eval_only:
+        rows = list(csv.DictReader(open(OUT, encoding="utf-8")))
+        for r in rows:
+            r["is_mixed"] = str(r.get("is_mixed")).strip().lower() == "true"
+            r["is_ood"] = str(r.get("is_ood")).strip().lower() == "true"
+        print(f"evaluating existing {len(rows)} items from {OUT.name}", file=sys.stderr)
+        evaluate(rows, args)
+        return
 
     print(f"generating with {args.provider}:{args.model} …", file=sys.stderr)
     rows = generate(args)

@@ -113,14 +113,21 @@ def _normalize_confidence(value: Any) -> float:
 
 def normalize(obj: dict[str, Any]) -> dict[str, Any]:
     label = _normalize_label(obj.get("label"))
-    group = obj.get("group")
-    group = _CANON_GROUP.get(str(group).strip().casefold()) if group is not None else None
+    raw_group = obj.get("group")
+    if isinstance(raw_group, str) and raw_group.strip().upper() == "OTHER":
+        group = "OTHER"  # a Good that fits none of the 7 groups (out-of-taxonomy → review)
+    else:
+        group = _CANON_GROUP.get(str(raw_group).strip().casefold()) if raw_group is not None else None
     if label != "Good":
         group = None
+    components = obj.get("components")
     return {
         "label": label,
         "group": group,
         "confidence": _normalize_confidence(obj.get("confidence")),
+        "is_mixed": bool(obj.get("is_mixed")),
+        "needs_review": bool(obj.get("needs_review")),
+        "components": components if isinstance(components, list) else [],
     }
 
 
