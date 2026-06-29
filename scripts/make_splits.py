@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import random
 from pathlib import Path
-from typing import Iterable
 
 import pandas as pd
 
@@ -10,6 +9,12 @@ ROOT = Path(__file__).resolve().parents[1]
 INPUT = ROOT / "data/processed/labeled_items.csv"
 COLUMNS = ["text", "label", "group", "group_verbose", "source"]
 SPLITS = ["train", "dev", "test"]
+SEED = 42
+
+
+def _normtext(value: object) -> str:
+    """Whitespace-collapsed, case-folded key used to detect duplicate items."""
+    return " ".join(str(value).split()).casefold()
 
 
 def _split_counts(size: int) -> tuple[int, int, int]:
@@ -26,70 +31,61 @@ def _split_counts(size: int) -> tuple[int, int, int]:
     return train, dev, test
 
 
-def _indices_for_split(indices: list[int]) -> dict[str, list[int]]:
-    shuffled = list(indices)
-    random.Random(42).shuffle(shuffled)
-    train_n, dev_n, test_n = _split_counts(len(shuffled))
-    return {
-        "train": shuffled[:train_n],
-        "dev": shuffled[train_n : train_n + dev_n],
-        "test": shuffled[train_n + dev_n : train_n + dev_n + test_n],
-    }
-
-
-def _print_split_counts(frames: dict[str, pd.DataFrame]) -> None:
-    total = sum(len(frame) for frame in frames.values())
-    print(f"total: {total}")
-    for split in SPLITS:
-        print(f"{split}: {len(frames[split])}")
-
-
-def _split_table(df: pd.DataFrame, frames: dict[str, pd.DataFrame]) -> pd.DataFrame:
-    strata = df[["label", "group"]].drop_duplicates().sort_values(["label", "group"])
-    rows: list[dict[str, object]] = []
-    for _, stratum in strata.iterrows():
-        row: dict[str, object] = {"label": stratum["label"], "group": stratum["group"]}
-        for split in SPLITS:
-            frame = frames[split]
-            group_mask = frame["group"].isna() if pd.isna(stratum["group"]) else frame["group"] == stratum["group"]
-            mask = (frame["label"] == stratum["label"]) & group_mask
-            row[split] = int(mask.sum())
-        rows.append(row)
-    return pd.DataFrame(rows, columns=["label", "group"] + SPLITS)
-
-
-def _label_balance(frames: dict[str, pd.DataFrame]) -> pd.DataFrame:
-    labels: Iterable[object] = sorted({label for frame in frames.values() for label in frame["label"].dropna().unique()})
-    rows: list[dict[str, object]] = []
-    for label in labels:
-        row: dict[str, object] = {"label": label}
-        for split in SPLITS:
-            row[split] = int((frames[split]["label"] == label).sum())
-        rows.append(row)
-    return pd.DataFrame(rows, columns=["label"] + SPLITS)
-
-
 def main() -> None:
     df = pd.read_csv(INPUT, usecols=COLUMNS)
-    split_indices: dict[str, list[int]] = {split: [] for split in SPLITS}
+    n_rows = len(df)
 
-    for _, group_df in df.groupby(["label", "group"], sort=True, dropna=False):
-        assigned = _indices_for_split(list(group_df.index))
-        for split in SPLITS:
-            split_indices[split].extend(assigned[split])
+    # --- Deduplicate to UNIQUE item text BEFORE splitting. -------------------
+    # The previous version split raw rows, so identical item strings scattered
+    # across train/dev/test and ~20% of eval items leaked verbatim (with their
+    # gold labels) into the train-based RAG index. Splitting unique texts makes
+    # train/dev/test disjoint by construction, so retrieval can never hand an
+    # eval item its own answer.
+    df["_norm"] = df["text"].map(_normtext)
+    inconsistent = int((df.groupby("_norm")["label"].nunique() > 1).sum())
+    uniq = df.drop_duplicates("_norm", keep="first").reset_index(drop=True)
 
-    frames = {
-        split: df.loc[sorted(split_indices[split]), COLUMNS].reset_index(drop=True)
-        for split in SPLITS
-    }
-    for split, frame in frames.items():
-        frame.to_csv(ROOT / f"data/processed/{split}.csv", index=False)
+    # --- Stratified split of the UNIQUE texts by (label, group). -------------
+    split_rows: dict[str, list[int]] = {s: [] for s in SPLITS}
+    rng = random.Random(SEED)
+    for _, stratum in uniq.groupby(["label", "group"], sort=True, dropna=False):
+        idx = list(stratum.index)
+        rng.shuffle(idx)
+        tr, dv, te = _split_counts(len(idx))
+        split_rows["train"].extend(idx[:tr])
+        split_rows["dev"].extend(idx[tr : tr + dv])
+        split_rows["test"].extend(idx[tr + dv : tr + dv + te])
 
-    _print_split_counts(frames)
-    print("\nper-(label,group) counts:")
-    print(_split_table(df, frames).to_string(index=False))
-    print("\noverall label balance:")
-    print(_label_balance(frames).to_string(index=False))
+    frames = {s: uniq.loc[sorted(split_rows[s]), COLUMNS].reset_index(drop=True) for s in SPLITS}
+
+    # --- Hard assert: ZERO cross-split text overlap (the whole point). -------
+    norms = {s: set(frames[s]["text"].map(_normtext)) for s in SPLITS}
+    for a in SPLITS:
+        for b in SPLITS:
+            if a < b:
+                shared = norms[a] & norms[b]
+                assert not shared, f"LEAKAGE: {len(shared)} texts shared between {a} and {b}"
+
+    for s in SPLITS:
+        frames[s].to_csv(ROOT / f"data/processed/{s}.csv", index=False)
+
+    # --- Report. -------------------------------------------------------------
+    total = sum(len(frames[s]) for s in SPLITS)
+    print(f"input rows: {n_rows} | unique texts: {len(uniq)} | written: {total}")
+    if inconsistent:
+        print(f"note: {inconsistent} texts had >1 distinct label in the source; kept first occurrence")
+    for s in SPLITS:
+        print(f"  {s}: {len(frames[s])}")
+    print("OK — asserted zero train/dev/test text overlap")
+    print("\nper-(label,group)  [train/dev/test]:")
+    strata = uniq[["label", "group"]].drop_duplicates().sort_values(["label", "group"], na_position="last")
+    for _, st in strata.iterrows():
+        counts = []
+        for s in SPLITS:
+            f = frames[s]
+            gm = f["group"].isna() if pd.isna(st["group"]) else f["group"] == st["group"]
+            counts.append(int(((f["label"] == st["label"]) & gm).sum()))
+        print(f"  {str(st['label']):8} {str(st['group']):24} {counts[0]}/{counts[1]}/{counts[2]}")
 
 
 if __name__ == "__main__":

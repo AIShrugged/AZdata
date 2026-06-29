@@ -69,7 +69,9 @@ The headline result: a **24 GB open-weight model** (`qwen3.5-35b-a3b`) reaches *
 
 ---
 
-## 5. Results (held-out test, 1,298 items — never used for tuning)
+## 5. Results
+
+*Journey on the **original** split — indicative of the **relative** gains (RAG is the big lever, then prompt-opt); the absolute values were inflated by ~20% train/eval leakage, since fixed. **Validated leak-free numbers are below the table.***
 
 | Model | Where | Config | Label | Group | Fully correct |
 |---|---|---|---|---|---|
@@ -78,9 +80,15 @@ The headline result: a **24 GB open-weight model** (`qwen3.5-35b-a3b`) reaches *
 | **qwen3.5 35B** | **local** | **+ RAG + prompt-opt** | **99.38%** | **99.39%** | **99.00%** ★ |
 | qwen3.5 122B | cloud/API | + RAG | 99.46% | 99.39% | 99.31% |
 
-> **⚠️ These numbers are under re-validation.** A code audit (`docs/AUDIT.md`) found that ~20% of dev/test items leak verbatim — with their gold labels — into the train-based RAG retrieval index (measured 19.5% dev / 20.2% test). That **inflates the figures below (micro *and* macro)**; they are not a valid generalization estimate until the data is re-split (text/source dedup) and the eval is re-run.
+> **⚠️ The table above was the original split — and it was inflated.** A code audit (`docs/AUDIT.md`) found ~20% of eval items appeared verbatim — with gold labels — in the train-based RAG index. **Fixed:** `make_splits.py` now splits *unique texts* and asserts zero train↔eval overlap. Re-run on the leak-free split (1,094 unique-text test items):
 
-Good/Service (the core decision) is ~99.4% (macro-F1 99.2%). **The 7-group figure above is micro-averaged** and is dominated by BAKERY (~73% of Goods); the **macro-F1 is 85.5%**, because the data-starved **DENTAL MEDICINE** class (n=6 total; 1 in test) scores 0% while the other six groups score 99–100% F1. The honest headline for the 7-group task is **micro 99.4% / macro 85.5%**. All numbers reproduce on the untouched test split.
+| **Validated (leak-free)** | Result |
+|---|---|
+| **Good / Service** | **micro 99.5% · macro-F1 99.4%** |
+| **7 product groups** | **micro 98.9% · macro-F1 82.7%** |
+| **Fully correct (label + group)** | **98.9%** |
+
+Per-group F1: BAKERY 99.4 · CANNED 99.6 · WIPES 96.4 · MED.SYRINGES 100 · UTILITIES 100 (n=4) · TOWELS 83 (n=6) · **DENTAL 0 (n=1)**. Removing the leak cost ~0.5 pt micro / ~3 pts macro — the system is genuinely strong on Good/Service and the common groups, while **macro is held down by data-starved classes** (DENTAL n=6, TOWELS n=6), exactly as expected with so few examples.
 
 > **Two honest limitations** (see the README *Limitations* section for the full version): (1) the macro/micro gap above is a rare-class **data-starvation** problem (DENTAL, n=6) — fix with more data or an abstain option; (2) the 7 groups are **hardcoded into every prompt**, which is fine for 7 classes but does not scale to thousands — the scalable fix is retrieval-based label selection, the same pattern already used for the 11,641 EQM HS codes.
 
