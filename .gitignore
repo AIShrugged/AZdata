@@ -33,3 +33,8 @@ data/processed/eval_pred_codex.json
 
 # Logs
 *.log
+
+# Synthetic + eval outputs (regenerate with the scripts)
+data/processed/synthetic.csv
+data/processed/clean_eval_*.json
+data/processed/eval_clean_*.json
