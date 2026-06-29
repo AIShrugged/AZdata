@@ -75,10 +75,20 @@
     .badge.good{background:var(--green-bg);color:var(--green)}.badge.service{background:var(--blue-bg);color:var(--blue)}
     .tag{border-radius:999px;padding:2px 8px;font-size:12px;font-weight:740}
     .tag.local{background:var(--green-bg);color:var(--green)}.tag.cloud{background:var(--amber-bg);color:var(--amber)}
+    .tag.review{background:var(--red-bg);color:var(--red)}.tag.mixed{background:var(--blue-bg);color:var(--blue)}
+    .tag.reason-taxonomy_gap{background:var(--blue-bg);color:var(--blue)}
+    .tag.reason-data_error{background:var(--red-bg);color:var(--red)}
+    .tag.reason-ambiguous{background:var(--amber-bg);color:var(--amber)}
+    .tag.reason-low_confidence{background:var(--soft);color:#344054}
     .result-card{display:grid;gap:14px}.facts{display:grid;gap:8px;color:#344054}
     .hs-desc{display:block;margin-top:3px;color:var(--muted);font-size:13px;font-weight:400}
     .footer{display:flex;flex-wrap:wrap;align-items:center;gap:8px;border-top:1px solid var(--line);padding-top:12px;color:var(--muted);font-size:13px}
     .eval-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
+    .review-stats{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:14px;color:#344054}
+    .review-actions{display:flex;flex-wrap:wrap;gap:8px}.review-actions button{min-height:34px;min-width:0;padding:0 10px;font-size:13px}
+    .correct-form{display:grid;grid-template-columns:120px minmax(180px,1fr) auto;gap:8px;margin-top:10px}
+    .correct-form[hidden]{display:none}.correct-form select,.correct-form button{min-height:36px}
+    .flash{margin-bottom:14px;border:1px solid #abefc6;border-radius:8px;background:var(--green-bg);color:var(--green);padding:10px 12px;font-weight:700}
     .section{border-top:1px solid var(--line);padding-top:18px;margin-top:18px}
     .section:first-of-type{border-top:0;padding-top:0;margin-top:0}
     h2,h3{margin:0;letter-spacing:0}h2{font-size:22px;line-height:1.25}h3{font-size:16px;margin-bottom:10px}
@@ -99,6 +109,7 @@
       .top{display:grid}.tabs{width:100%}.tab{flex:1;padding:0 8px}main{padding:16px}
       form,#classify-form{grid-template-columns:1fr}button{width:100%}
       .eval-head{align-items:stretch;flex-direction:column}.confusion{grid-template-columns:1fr}.truncate{max-width:260px}
+      .correct-form{grid-template-columns:1fr}.review-actions{display:grid}
       .chip,.copy-sql{width:auto}.pre-head{align-items:flex-start;flex-direction:column}
     }
   </style>
@@ -117,6 +128,7 @@
         <button class="tab active" type="button" data-tab="query">NL Query</button>
         <button class="tab" type="button" data-tab="classify">Classify item</button>
         <button class="tab" type="button" data-tab="evals">Evals</button>
+        <button class="tab" type="button" data-tab="review">Review</button>
         <button class="tab" type="button" data-tab="report">Report</button>
       </nav>
     </header>
@@ -160,6 +172,13 @@
         </div>
         <div id="evals-output" class="output"></div>
       </section>
+      <section id="review" class="pane">
+        <div class="eval-head">
+          <div><h2>Review</h2><p class="sub">Human review queue from <code>/review/queue</code></p></div>
+          <button id="review-refresh" class="ghost" type="button">Refresh</button>
+        </div>
+        <div id="review-output" class="output"></div>
+      </section>
       <section id="report" class="pane">
         <iframe class="report-frame" src="/report.html" title="Solution report — how it was done"></iframe>
       </section>
@@ -167,8 +186,8 @@
   </div>
   <script>
     const $=id=>document.getElementById(id);
-    const statusEl=$("status"),queryOutput=$("query-output"),classifyOutput=$("classify-output"),evalsOutput=$("evals-output");
-    let evalsLoaded=false;
+    const statusEl=$("status"),queryOutput=$("query-output"),classifyOutput=$("classify-output"),evalsOutput=$("evals-output"),reviewOutput=$("review-output");
+    let evalsLoaded=false,reviewFlash="";
 
     function escapeHTML(value){
       return String(value==null?"":value).replace(/&/g,"&amp;").replace(/</g,"&lt;")
@@ -178,6 +197,7 @@
     function widthPct(value){const n=Number(value);return Number.isFinite(n)?Math.max(0,Math.min(100,n)):0}
     function errorMessage(err){return err&&(err.error||err.detail||err.message)||String(err||"Request failed")}
     function showError(target,err){target.innerHTML=`<div class="error">${escapeHTML(errorMessage(err))}</div>`}
+    function reasonClass(reason){return `reason-${String(reason||"").replace(/[^a-z0-9_-]/gi,"_")}`}
 
     async function postJSON(path,body){
       const response=await fetch(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
@@ -238,12 +258,19 @@
     function renderClassifyResult(data){
       const label=String(data.label||"").toUpperCase(),isGood=label==="GOOD",tier=String(data.tier||"unknown");
       const cloud=/strong|cloud/i.test(tier),conf=Number(data.confidence),escalated=data.escalated?" · escalated":"";
+      const needsReview=data.needs_review===true,mixed=data.is_mixed===true,components=Array.isArray(data.components)?data.components:[];
       classifyOutput.innerHTML=`
         <div class="card result-card">
-          <div><span class="badge ${isGood?"good":"service"}">${escapeHTML(label||"UNKNOWN")}</span></div>
+          <div>
+            <span class="badge ${isGood?"good":"service"}">${escapeHTML(label||"UNKNOWN")}</span>
+            ${needsReview?`<span class="tag review">⚠ Needs review</span>`:""}
+            ${needsReview?`<span class="muted small">→ queued for review</span>`:""}
+            ${mixed?`<span class="tag mixed">Mixed</span>`:""}
+          </div>
           <div class="facts">
             ${data.group?`<div><strong>Group:</strong> ${escapeHTML(data.group)}</div>`:""}
             ${data.hs_code?`<div><strong>HS code:</strong> ${escapeHTML(data.hs_code)}<span class="hs-desc">${escapeHTML(data.hs_description||"")}</span></div>`:""}
+            ${mixed&&components.length?`<div><strong>Components:</strong> ${components.map(item=>`${escapeHTML(item.part||item.text||"part")} (${escapeHTML(item.kind||item.label||"unknown")})`).join(", ")}</div>`:""}
           </div>
           <div class="footer">
             <span>handled by:</span><span class="tag ${cloud?"cloud":"local"}">${escapeHTML(tier)}</span>
@@ -309,6 +336,55 @@
         <section class="section"><h3>Misclassified examples</h3>${renderMisclassified(t2.misclassified)}</section>
         <section class="section"><h3>Task 1</h3><p class="muted">${escapeHTML(t1.scenario1||"")}</p><p class="muted">${escapeHTML(t1.guard||"")}</p></section>`;
     }
+    function renderReviewStats(stats){
+      const s=stats||{},override=Number(s.override_rate),rate=Number.isFinite(override)?(override<=1?override*100:override):0;
+      const reasons=Object.entries(s.by_reason||{}).map(([reason,count])=>`<span class="tag ${reasonClass(reason)}">${escapeHTML(reason)}: ${escapeHTML(count)}</span>`).join("");
+      return `<div class="review-stats">
+        <strong>Pending: ${escapeHTML(s.pending??0)} · Reviewed: ${escapeHTML(s.reviewed??0)} · Override rate: ${escapeHTML(rate.toFixed(1))}% · Corrections fed back: ${escapeHTML(s.corrections_captured??0)}</strong>
+        ${reasons}
+      </div>`;
+    }
+    function renderCorrectForm(item){
+      const groups=["BAKERY","CANNED FISH","WIPES","MED.SYRINGES","TOWELS","PUBLIC UTILITIES WATER","DENTAL MEDICINE","OTHER"];
+      return `<div class="correct-form" data-correct-form="${escapeHTML(item.id)}" hidden>
+        <select data-correct-label aria-label="Corrected label">
+          <option value="Good">Good</option>
+          <option value="Service">Service</option>
+        </select>
+        <select data-correct-group aria-label="Corrected group">
+          <option value=""></option>
+          ${groups.map(group=>`<option value="${escapeHTML(group)}">${escapeHTML(group)}</option>`).join("")}
+        </select>
+        <button type="button" data-review-action="save" data-id="${escapeHTML(item.id)}">Save</button>
+      </div>`;
+    }
+    function renderReviewItems(items){
+      if(!Array.isArray(items)||!items.length)return `<div class="empty">No items awaiting review.</div>`;
+      const rows=items.map(item=>{
+        const conf=Number(item.confidence),prediction=[item.pred_label,item.pred_group].filter(Boolean).join(" / ");
+        return `<tr>
+          <td>${escapeHTML(item.text)}${item.is_mixed?` <span class="tag mixed">Mixed</span>`:""}</td>
+          <td><span class="tag ${reasonClass(item.reason)}">${escapeHTML(item.reason||"unknown")}</span></td>
+          <td>${escapeHTML(prediction||"n/a")} <span class="muted small">(conf ${escapeHTML(Number.isFinite(conf)?conf.toFixed(2):"n/a")})</span></td>
+          <td>
+            <div class="review-actions">
+              <button class="ghost" type="button" data-review-action="accept" data-id="${escapeHTML(item.id)}">Accept</button>
+              <button class="ghost" type="button" data-review-action="correct" data-id="${escapeHTML(item.id)}">Correct</button>
+              <button class="ghost" type="button" data-review-action="data_error" data-id="${escapeHTML(item.id)}">Data error</button>
+            </div>
+            ${renderCorrectForm(item)}
+          </td>
+        </tr>`;
+      }).join("");
+      return `<div class="table-wrap"><table><thead><tr><th>Item</th><th>Reason</th><th>Model prediction</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }
+    function renderReview(data){
+      reviewOutput.innerHTML=`
+        ${reviewFlash?`<div class="flash">${escapeHTML(reviewFlash)}</div>`:""}
+        ${renderReviewStats(data.stats)}
+        ${renderReviewItems(data.items)}`;
+      reviewFlash="";
+    }
     async function loadHealth(){
       try{
         const data=await getJSON("/health"),ready=data.task2_ready==null?"n/a":data.task2_ready;
@@ -323,11 +399,29 @@
       };
       return button?withButton(button,"…",work):work();
     }
+    async function loadReview(button){
+      reviewOutput.innerHTML=`<div class="empty">Loading review queue...</div>`;
+      const work=async()=>{
+        try{renderReview(await getJSON("/review/queue?status=pending"))}
+        catch(err){showError(reviewOutput,err)}
+      };
+      return button?withButton(button,"…",work):work();
+    }
+    async function resolveReview(button,body){
+      await withButton(button,"…",async()=>{
+        try{
+          const data=await postJSON("/review/resolve",body);
+          reviewFlash=data.index_updated?"✓ saved — index updated":"✓ saved";
+          await loadReview();
+        }catch(err){showError(reviewOutput,err)}
+      });
+    }
 
     document.querySelectorAll(".tab").forEach(tab=>tab.addEventListener("click",()=>{
       document.querySelectorAll(".tab").forEach(item=>item.classList.toggle("active",item===tab));
       document.querySelectorAll(".pane").forEach(pane=>pane.classList.toggle("active",pane.id===tab.dataset.tab));
       if(tab.dataset.tab==="evals"&&!evalsLoaded)loadEvals();
+      if(tab.dataset.tab==="review")loadReview();
     }));
     document.querySelectorAll(".chip").forEach(chip=>chip.addEventListener("click",()=>{
       $(chip.dataset.fill).value=chip.dataset.value;
@@ -354,6 +448,23 @@
       });
     });
     $("evals-refresh").addEventListener("click",event=>loadEvals(event.currentTarget));
+    $("review-refresh").addEventListener("click",event=>loadReview(event.currentTarget));
+    $("review-output").addEventListener("click",event=>{
+      const button=event.target.closest("[data-review-action]");
+      if(!button)return;
+      const id=button.dataset.id,action=button.dataset.reviewAction;
+      if(action==="correct"){
+        const form=reviewOutput.querySelector(`[data-correct-form="${CSS.escape(id)}"]`);
+        if(form)form.hidden=!form.hidden;
+        return;
+      }
+      if(action==="save"){
+        const form=button.closest(".correct-form");
+        resolveReview(button,{id,decision:"correct",corrected_label:form.querySelector("[data-correct-label]").value,corrected_group:form.querySelector("[data-correct-group]").value});
+        return;
+      }
+      resolveReview(button,{id,decision:action});
+    });
     loadHealth();
   </script>
 </body>
