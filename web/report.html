@@ -6,13 +6,12 @@
   <title>AZdata — Solution Report</title>
   <style>
     :root {
-      color-scheme: light;
-      --body: #f7f8fb;
-      --panel: #fff;
       --text: #182230;
       --muted: #667085;
       --brand: #175cd3;
       --border: #d9e0ea;
+      --panel: #fff;
+      --body: #f7f8fb;
       --table-head: #f3f6fa;
       --best: #ecfdf3;
       --code-bg: #101828;
@@ -23,103 +22,103 @@
       box-sizing: border-box;
     }
 
+    html {
+      background: var(--body);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.68;
+    }
+
     body {
       margin: 0;
       padding: 28px;
       background: var(--body);
-      color: var(--text);
-      font-family:
-        -apple-system,
-        BlinkMacSystemFont,
-        "Segoe UI",
-        Roboto,
-        "Helvetica Neue",
-        Arial,
-        sans-serif;
-      font-size: 16px;
-      line-height: 1.68;
     }
 
     main {
       max-width: 860px;
       margin: 0 auto;
-      padding: 44px 48px 56px;
+      padding: 42px 46px 52px;
       background: var(--panel);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      box-shadow: 0 10px 30px rgba(16, 24, 40, 0.05);
+      border-radius: 8px;
+      box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+    }
+
+    header {
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 34px;
     }
 
     h1,
     h2,
     h3 {
       color: var(--text);
-      line-height: 1.22;
+      line-height: 1.24;
       letter-spacing: 0;
+      margin: 0;
     }
 
     h1 {
-      margin: 0 0 8px;
-      font-size: 2.55rem;
-      font-weight: 760;
+      font-size: 2.35rem;
+      font-weight: 750;
+      margin-bottom: 10px;
     }
 
     h2 {
-      margin: 42px 0 16px;
-      padding-top: 30px;
-      border-top: 1px solid var(--border);
-      font-size: 1.46rem;
+      font-size: 1.45rem;
       font-weight: 720;
+      margin-top: 40px;
+      padding-top: 28px;
+      border-top: 1px solid var(--border);
+    }
+
+    h2:first-of-type {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: 0;
     }
 
     h3 {
-      margin: 28px 0 12px;
-      font-size: 1.08rem;
+      font-size: 1.1rem;
       font-weight: 700;
-    }
-
-    p {
-      margin: 0 0 18px;
+      margin-top: 28px;
     }
 
     .subtitle {
-      margin: 0 0 28px;
+      margin: 0;
       color: var(--muted);
-      font-size: 1.04rem;
+      font-size: 1.06rem;
+      font-style: italic;
     }
 
-    .rule {
-      height: 1px;
-      margin: 30px 0 8px;
-      background: var(--border);
-    }
-
-    a {
-      color: var(--brand);
+    p {
+      margin: 14px 0 0;
     }
 
     strong {
-      font-weight: 720;
+      font-weight: 700;
     }
 
     ul,
     ol {
-      margin: 0 0 22px;
+      margin: 14px 0 0;
       padding-left: 1.35rem;
     }
 
     li {
       margin: 8px 0;
-      padding-left: 2px;
     }
 
     blockquote {
-      margin: 22px 0;
-      padding: 16px 18px;
-      color: #344054;
+      margin: 20px 0 0;
+      padding: 14px 18px;
+      color: var(--text);
       background: #f8fafc;
       border-left: 4px solid var(--brand);
-      border-radius: 8px;
+      border-radius: 0 8px 8px 0;
     }
 
     blockquote p {
@@ -127,51 +126,44 @@
     }
 
     code {
-      padding: 0.13rem 0.34rem;
-      color: #0f3f9a;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 0.92em;
+      color: #0b4a8f;
       background: #eef4ff;
-      border: 1px solid #d5e3ff;
+      border: 1px solid #d7e7ff;
       border-radius: 5px;
-      font-family:
-        ui-monospace,
-        SFMono-Regular,
-        Menlo,
-        Monaco,
-        Consolas,
-        "Liberation Mono",
-        "Courier New",
-        monospace;
-      font-size: 0.91em;
+      padding: 0.08rem 0.3rem;
     }
 
     pre {
-      margin: 20px 0 24px;
+      margin: 18px 0 0;
       padding: 18px 20px;
       overflow-x: auto;
+      white-space: pre;
       color: var(--code-text);
       background: var(--code-bg);
-      border-radius: 10px;
+      border-radius: 8px;
       line-height: 1.48;
       tab-size: 2;
-      -webkit-overflow-scrolling: touch;
     }
 
     pre code {
       display: block;
+      min-width: max-content;
       padding: 0;
       color: inherit;
       background: transparent;
       border: 0;
       border-radius: 0;
-      font-size: 0.9rem;
-      white-space: pre;
+      font-size: 0.91rem;
     }
 
     .table-wrap {
-      margin: 22px 0 18px;
+      margin-top: 18px;
       overflow-x: auto;
       border: 1px solid var(--border);
-      border-radius: 10px;
+      border-radius: 8px;
+      background: var(--panel);
     }
 
     table {
@@ -183,55 +175,52 @@
 
     th,
     td {
-      padding: 12px 14px;
+      padding: 11px 14px;
       border-bottom: 1px solid var(--border);
       text-align: left;
       vertical-align: top;
     }
 
     th {
-      background: var(--table-head);
       color: #344054;
+      background: var(--table-head);
       font-size: 0.88rem;
-      font-weight: 720;
+      font-weight: 700;
     }
 
     tr:last-child td {
       border-bottom: 0;
     }
 
-    td:nth-child(4),
-    td:nth-child(5),
-    td:nth-child(6),
-    th:nth-child(4),
-    th:nth-child(5),
-    th:nth-child(6) {
+    td.percent,
+    th.percent {
       text-align: right;
       white-space: nowrap;
     }
 
-    tr.best-local td {
+    tr.best-local {
       background: var(--best);
+    }
+
+    a {
+      color: var(--brand);
     }
 
     @media (max-width: 720px) {
       body {
         padding: 18px;
-        font-size: 15px;
       }
 
       main {
-        padding: 30px 22px 38px;
-        border-radius: 10px;
+        padding: 30px 24px 38px;
       }
 
       h1 {
-        font-size: 2rem;
+        font-size: 1.9rem;
       }
 
       h2 {
-        margin-top: 36px;
-        padding-top: 24px;
+        font-size: 1.28rem;
       }
     }
   </style>
@@ -240,13 +229,11 @@
   <main>
     <header>
       <h1>AZdata — e-Invoice AI · Solution Report</h1>
-      <p class="subtitle"><em>How the two tasks were solved, and how the results are presented.</em></p>
+      <p class="subtitle">How the two tasks were solved, and how the results are presented.</p>
     </header>
 
-    <div class="rule" aria-hidden="true"></div>
-
-    <section aria-labelledby="what-was-built">
-      <h2 id="what-was-built">1. What was built</h2>
+    <section>
+      <h2>1. What was built</h2>
       <p>A single web application that delivers two capabilities for Azerbaijani tax-authority e-invoice data:</p>
       <ul>
         <li><strong>Task 1 — Natural-language → SQL.</strong> Ask a question in Azerbaijani or English about the e-invoice data; the system writes safe SQL against a metadata catalog and returns the answer.</li>
@@ -255,8 +242,8 @@
       <p>Both are served by one backend (FastAPI) and one web app (three working tabs + this report).</p>
     </section>
 
-    <section aria-labelledby="architecture">
-      <h2 id="architecture">2. Architecture</h2>
+    <section>
+      <h2>2. Architecture</h2>
       <pre><code>Web app (NL Query · Classify · Evals · Report)
         │  HTTP/JSON
 FastAPI  /query  /classify  /evals  /health  /catalog
@@ -273,16 +260,16 @@ Postgres (einvoice, taxpayer)   BGE-M3 vector indexes
       <p>A single <code>call_llm(provider, model, …)</code> abstracts four providers, so the same code runs <strong>fully offline</strong> or <strong>cloud-backed</strong> by changing one setting.</p>
     </section>
 
-    <section aria-labelledby="task-1">
-      <h2 id="task-1">3. Task 1 — Natural-language → SQL</h2>
+    <section>
+      <h2>3. Task 1 — Natural-language → SQL</h2>
       <p><strong>Approach.</strong> A <strong>metadata catalog</strong> is parsed from the database DDL (tables, columns, types, comments) and enriched with <strong>business concepts + Azerbaijani/English synonyms + roles</strong> (measure / dimension / time / id). The catalog grounds the prompt, so the model maps natural language to the right columns. The model only <em>proposes</em> SQL.</p>
       <p><strong>Safety is structural, not prompt-trusted.</strong> Every generated query passes a deterministic <strong><code>sqlglot</code> guard</strong> — it must be a single <strong>read-only <code>SELECT</code></strong>, may reference <strong>only whitelisted tables/columns</strong>, and a <code>LIMIT</code> is enforced — and it executes inside a <strong>read-only Postgres session</strong>. Writes, DDL, multi-statements, and access to system catalogs are rejected even if the model misbehaves.</p>
       <p><strong>Result.</strong> The brief's Scenario 1 — <em>"turnover for the last 4 days, taxpayer 1234567890"</em> — returns the four daily figures (25000 / 18000 / 31000 / 22000 = <strong>96000</strong>), verified in <strong>both English and Azerbaijani</strong>, and cross-checked against the database. The guard was tested to block <code>DELETE</code>/<code>UPDATE</code>/<code>DROP</code>/system-catalog/hallucinated-column inputs.</p>
       <p><strong>In the UI:</strong> the <em>NL Query</em> tab shows the generated SQL and the result table.</p>
     </section>
 
-    <section aria-labelledby="task-2">
-      <h2 id="task-2">4. Task 2 — Invoice-item classification</h2>
+    <section>
+      <h2>4. Task 2 — Invoice-item classification</h2>
       <p>The headline result: a <strong>24 GB open-weight model</strong> (<code>qwen3.5-35b-a3b</code>) reaches <strong>99% accuracy</strong> on a held-out test set. It is <strong>deployable fully on-device</strong> — 24 GB fits the target 128 GB machine — so the solution can run <strong>private</strong>, with the cloud used only as an optional escalation tier.</p>
       <blockquote>
         <p><em>Note on how this was measured:</em> we benchmarked the model via the <strong>OpenRouter API</strong> for fast iteration. The weights are identical to a local Ollama deployment, so accuracy is a property of the model + method, not of where it runs. The embedding model (BGE-M3) already runs locally. For a fully-offline deployment, the 35B model is downloaded to Ollama (a one-time 24 GB pull); the 9.7B variant is already local.</p>
@@ -298,8 +285,8 @@ Postgres (einvoice, taxpayer)   BGE-M3 vector indexes
       <p><strong>In the UI:</strong> the <em>Classify item</em> tab shows label + group + HS code + which tier handled it; the <em>Evals</em> tab shows the full evidence.</p>
     </section>
 
-    <section aria-labelledby="results">
-      <h2 id="results">5. Results (held-out test, 1,298 items — never used for tuning)</h2>
+    <section>
+      <h2>5. Results (held-out test, 1,298 items — never used for tuning)</h2>
       <div class="table-wrap">
         <table>
           <thead>
@@ -307,9 +294,9 @@ Postgres (einvoice, taxpayer)   BGE-M3 vector indexes
               <th scope="col">Model</th>
               <th scope="col">Where</th>
               <th scope="col">Config</th>
-              <th scope="col">Label</th>
-              <th scope="col">Group</th>
-              <th scope="col">Fully correct</th>
+              <th scope="col" class="percent">Label</th>
+              <th scope="col" class="percent">Group</th>
+              <th scope="col" class="percent">Fully correct</th>
             </tr>
           </thead>
           <tbody>
@@ -317,42 +304,45 @@ Postgres (einvoice, taxpayer)   BGE-M3 vector indexes
               <td>qwen3.5 9.7B</td>
               <td>local</td>
               <td>no retrieval</td>
-              <td>74.1%</td>
-              <td>48.4%</td>
-              <td>60.8%</td>
+              <td class="percent">74.1%</td>
+              <td class="percent">48.4%</td>
+              <td class="percent">60.8%</td>
             </tr>
             <tr>
               <td>qwen3.5 35B</td>
               <td>local</td>
               <td>+ RAG</td>
-              <td>99.08%</td>
-              <td>99.18%</td>
-              <td>98.92%</td>
+              <td class="percent">99.08%</td>
+              <td class="percent">99.18%</td>
+              <td class="percent">98.92%</td>
             </tr>
             <tr class="best-local">
               <td><strong>qwen3.5 35B</strong></td>
               <td><strong>local</strong></td>
               <td><strong>+ RAG + prompt-opt</strong></td>
-              <td><strong>99.38%</strong></td>
-              <td><strong>99.39%</strong></td>
-              <td><strong>99.00%</strong> ★</td>
+              <td class="percent"><strong>99.38%</strong></td>
+              <td class="percent"><strong>99.39%</strong></td>
+              <td class="percent"><strong>99.00%</strong> ★</td>
             </tr>
             <tr>
               <td>qwen3.5 122B</td>
               <td>cloud/API</td>
               <td>+ RAG</td>
-              <td>99.46%</td>
-              <td>99.39%</td>
-              <td>99.31%</td>
+              <td class="percent">99.46%</td>
+              <td class="percent">99.39%</td>
+              <td class="percent">99.31%</td>
             </tr>
           </tbody>
         </table>
       </div>
-      <p>Good/Service (the core decision) is ~99.4%; the few remaining misses are the genuinely rare/ambiguous classes (a single dental item, one utility). All numbers are reproducible on the untouched test split.</p>
+      <p>Good/Service (the core decision) is ~99.4% (macro-F1 99.2%). <strong>The 7-group figure above is micro-averaged</strong> and is dominated by BAKERY (~73% of Goods); the <strong>macro-F1 is 85.5%</strong>, because the data-starved <strong>DENTAL MEDICINE</strong> class (n=6 total; 1 in test) scores 0% while the other six groups score 99–100% F1. The honest headline for the 7-group task is <strong>micro 99.4% / macro 85.5%</strong>. All numbers reproduce on the untouched test split.</p>
+      <blockquote>
+        <p><strong>Two honest limitations</strong> (see the README <em>Limitations</em> section for the full version): (1) the macro/micro gap above is a rare-class <strong>data-starvation</strong> problem (DENTAL, n=6) — fix with more data or an abstain option; (2) the 7 groups are <strong>hardcoded into every prompt</strong>, which is fine for 7 classes but does not scale to thousands — the scalable fix is retrieval-based label selection, the same pattern already used for the 11,641 EQM HS codes.</p>
+      </blockquote>
     </section>
 
-    <section aria-labelledby="methodology">
-      <h2 id="methodology">6. Methodology &amp; key decisions</h2>
+    <section>
+      <h2>6. Methodology &amp; key decisions</h2>
       <ul>
         <li><strong>Local-first for privacy</strong> — the chosen models are <strong>open-weight and deployable on-device</strong> (tax data need never leave the machine); cloud is an optional escalation tier, not a hard dependency. Accuracy was benchmarked via API on the identical weights.</li>
         <li><strong>Small model + smart context beats raw size</strong> — retrieval (RAG) did most of the work; we did not need a giant model.</li>
@@ -362,8 +352,8 @@ Postgres (einvoice, taxpayer)   BGE-M3 vector indexes
       </ul>
     </section>
 
-    <section aria-labelledby="how-to-run-it">
-      <h2 id="how-to-run-it">7. How to run it</h2>
+    <section>
+      <h2>7. How to run it</h2>
       <pre><code>export OPENROUTER_API_KEY=$(cat ~/.config/azdata/openrouter.key)   # cloud tier
 /tmp/azx/bin/python ~/Dev/AZdata/src/api.py                        # → http://127.0.0.1:8642/</code></pre>
       <p>The web app opens with four tabs: <strong>NL Query</strong>, <strong>Classify item</strong>, <strong>Evals</strong>, and this <strong>Report</strong>.</p>

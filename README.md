@@ -205,6 +205,17 @@ Held-out test set (1,298 items — never used for tuning):
 
 *Accuracy was benchmarked via the OpenRouter API on the identical open weights; the model is deployable on-device (24 GB). See [`docs/SOLUTION_REPORT.md`](docs/SOLUTION_REPORT.md).*
 
+> **⚠️ Micro vs macro — read this.** The **group** figures above are **micro-averaged** (per-item) and are dominated by BAKERY (~73% of Goods). The **macro-F1** (per-class average) is **85.5%**, because **DENTAL MEDICINE** is data-starved (6 labelled items total, 1 in the test split) and scores **0%**. The other six groups are **99–100% F1**, and **Good/Service** is genuinely ~99% (macro-F1 99.2%). Read the 7-group result as **micro 99.4% / macro 85.5%**. Mitigations and the taxonomy-scalability caveat are in [Limitations](#limitations).
+
+---
+
+## Limitations
+
+- **Class imbalance — micro vs macro.** The 7-group accuracy is **micro 99.4% / macro-F1 85.5%**. The gap is almost entirely **DENTAL MEDICINE** (n=6 total → unlearnable; 0% F1); the other six groups are 99–100% F1. Even the 122B model shows the same rare-class gap (macro ~82%) — it is the **data imbalance, not the model**. *Mitigations:* gather more labelled data for rare classes, and/or **abstain** ("uncertain / other") below a support/confidence threshold instead of guessing.
+- **Fixed taxonomy in the prompt (scalability).** The 7 groups + their hints are injected into **every** classification prompt. Fine for a 7-class brief; it does **not scale to thousands of groups**. The scalable design is **retrieval-based label selection** — exactly what this repo already does for the 11,641 EQM HS codes (retrieve candidates → rerank). The group classifier should adopt the same pattern (the few-shot retrieval already surfaces the relevant candidate groups), making the taxonomy data-driven rather than hardcoded.
+- **EQM HS-codes have no ground truth** in the sample data — accuracy is spot-checked, not measured.
+- **Scenario-1 demo data is seeded** (the `1234567890` taxpayer) per the brief — synthetic and illustrative, not a performance claim.
+
 ---
 
 ## Tech stack & key decisions
