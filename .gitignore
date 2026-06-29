@@ -38,3 +38,5 @@ data/processed/eval_pred_codex.json
 data/processed/synthetic.csv
 data/processed/clean_eval_*.json
 data/processed/eval_clean_*.json
+data/review_queue.db
+data/processed/corrections.csv

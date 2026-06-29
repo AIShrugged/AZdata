@@ -21,7 +21,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from catalog import build_catalog
 from nlsql import PROVIDER as DEFAULT_PROVIDER, answer
-import rag, eqm, router
+import rag, eqm, router, review
+import numpy as np
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("azdata")
@@ -37,6 +38,7 @@ ALLOWED_MODELS = {m for m in os.environ.get("AZDATA_ALLOWED_MODELS", "qwen/qwen3
 _cache_lock = threading.Lock()
 _rate_state: "dict[str, list]" = {}
 _rate_lock = threading.Lock()
+_index_lock = threading.Lock()
 
 
 def _cache_get(cache, key):
@@ -102,6 +104,22 @@ def _sanitize(result: dict) -> dict:
     return out
 
 
+def _apply_correction_to_index(correction: Optional[dict]) -> None:
+    """Live feedback: embed a human correction and append it to the in-memory RAG index so
+    future similar items benefit immediately (the durable copy lives in corrections.csv)."""
+    global RAG_EMB, RAG_META
+    if not correction or not TASK2_READY:
+        return
+    try:
+        vec = rag._l2norm(rag.embed_texts([correction["text"]]))  # (1, dim), normalized
+        meta_row = {"text": correction["text"], "label": correction["label"], "group": (correction.get("group") or None)}
+        with _index_lock:
+            RAG_EMB = np.vstack([RAG_EMB, vec])
+            RAG_META = RAG_META + [meta_row]
+    except Exception as exc:
+        log.warning("correction index append failed: %s", exc)
+
+
 app = FastAPI(title="AZdata e-invoice AI", version="0.2.0")
 app.add_middleware(
     CORSMiddleware,
@@ -144,6 +162,14 @@ class ClassifyRequest(BaseModel):
     local_model: Optional[str] = None
     strong_model: Optional[str] = None
     assign_hs: bool = True
+
+
+class ReviewResolveRequest(BaseModel):
+    id: int
+    decision: str  # accept | correct | data_error
+    corrected_label: Optional[str] = None
+    corrected_group: Optional[str] = None
+    reviewer: Optional[str] = None
 
 
 @app.get("/health")
@@ -234,6 +260,11 @@ def classify(request: Request, req: ClassifyRequest) -> Any:
             assign_hs=req.assign_hs,
             **route_kwargs,
         )
+        if result.get("needs_review"):
+            try:
+                review.enqueue(result)  # flagged items land in the human review queue
+            except Exception as exc:
+                log.warning("review enqueue failed: %s", exc)
         if result.get("label") is not None and not result.get("error"):
             _cache_put(_classify_cache, key, result)  # cache real successes only — never a failure/null
         ms = int((time.time() - start) * 1000)
@@ -246,6 +277,30 @@ def classify(request: Request, req: ClassifyRequest) -> Any:
         ms = int((time.time() - start) * 1000)
         log.info("classify text=%r latency_ms=%d cache=%s tier=%s escalated=%s", req.text[:60], ms, "miss", None, None)
         return JSONResponse(status_code=503, content=_sanitize(result))
+
+
+@app.get("/review/queue")
+def review_queue(request: Request, status: str = "pending", limit: int = 100) -> Any:
+    _check_request(request)
+    return {"items": review.list_queue(status=status, limit=min(limit, 500)), "stats": review.stats()}
+
+
+@app.post("/review/resolve")
+def review_resolve(request: Request, req: ReviewResolveRequest) -> Any:
+    _check_request(request)
+    try:
+        out = review.resolve(req.id, req.decision, req.corrected_label, req.corrected_group, req.reviewer or "reviewer")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    _apply_correction_to_index(out.get("correction"))  # live RAG feedback
+    out["index_updated"] = bool(out.get("correction"))
+    return out
+
+
+@app.get("/review/stats")
+def review_stats(request: Request) -> Any:
+    _check_request(request)
+    return review.stats()
 
 
 @app.get("/evals")
