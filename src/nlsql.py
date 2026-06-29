@@ -25,6 +25,8 @@ ROW_LIMIT = int(os.environ.get("AZDATA_ROW_LIMIT", "1000"))
 STMT_TIMEOUT_MS = int(os.environ.get("AZDATA_STATEMENT_TIMEOUT_MS", "5000"))
 LLM_TIMEOUT = int(os.environ.get("AZDATA_LLM_TIMEOUT", "120"))
 AZDATA_LLM_RETRIES = int(os.environ.get("AZDATA_LLM_RETRIES", "3"))
+DB_ROLE = os.environ.get("AZDATA_DB_ROLE", "azdata_ro")  # least-privilege role to SET ROLE into ("" disables)
+_ROLE_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 # Reasoning-capable local models (e.g. qwen3.5) burn minutes "thinking" for simple SQL; off by default.
 OLLAMA_THINK = os.environ.get("AZDATA_LLM_THINK", "false").strip().lower() in ("1", "true", "yes", "on")
 DSN = f"host={os.environ.get('PGHOST') or '/tmp'} port={os.environ.get('PGPORT') or '5432'} dbname={os.environ.get('PGDATABASE') or 'azdata'}"
@@ -211,6 +213,40 @@ def _literal_limit(select: exp.Select) -> int | None:
     return None
 
 
+# --- SQL function safety (deny-by-default) -------------------------------------
+# Functions the analytics NL→SQL layer may legitimately emit. Anything NOT in this
+# set is rejected, which blocks Postgres data-exfiltration / file / network / DoS
+# functions (database_to_xml, query_to_xml, dblink, pg_read_file, pg_sleep, …) —
+# these bypass the table/column/LIMIT checks because sqlglot parses them as opaque
+# Anonymous nodes containing no Table node.
+_ALLOWED_FUNCS = {
+    "sum", "count", "avg", "min", "max", "stddev", "stddev_pop", "stddev_samp", "variance", "var_pop", "var_samp",
+    "round", "abs", "ceil", "ceiling", "floor", "mod", "power", "pow", "sqrt", "sign", "trunc", "div", "exp", "ln", "log",
+    "coalesce", "nullif", "greatest", "least",
+    "cast", "to_char", "to_date", "to_number", "to_timestamp",
+    "lower", "upper", "initcap", "trim", "btrim", "ltrim", "rtrim", "length", "char_length", "character_length",
+    "substring", "substr", "left", "right", "concat", "concat_ws", "replace", "position", "split_part", "strpos",
+    "date_trunc", "date_part", "datediff", "extract", "now", "current_date", "current_timestamp", "current_time",
+    "age", "make_date", "date", "justify_days", "justify_hours",
+}
+# Explicitly dangerous name fragments — rejected for clear errors even if allowlisted by mistake.
+_BLOCKED_FUNC_SUBSTR = (
+    "_to_xml", "query_to_", "database_to_", "table_to_", "cursor_to_", "schema_to_", "xpath", "xmlelement",
+    "dblink", "pg_read", "pg_ls", "pg_stat_file", "lo_", "pg_sleep", "pg_logical", "pg_terminate", "pg_cancel",
+    "set_config", "current_setting", "txid", "pg_relation_", "pg_database_", "has_table_", "has_column_",
+)
+_SYSTEM_COLUMNS = {"ctid", "xmin", "xmax", "cmin", "cmax", "tableoid", "oid"}
+
+
+def _func_name(node: exp.Expression) -> str:
+    if isinstance(node, exp.Anonymous):
+        return str(node.name).casefold()
+    try:
+        return str(node.sql_name()).casefold()
+    except Exception:
+        return type(node).__name__.casefold()
+
+
 def guard_sql(sql: str, catalog: dict[str, Any], row_limit: int) -> str:
     try:
         statements = [stmt for stmt in sqlglot.parse(sql, dialect="postgres") if stmt is not None]
@@ -229,12 +265,26 @@ def guard_sql(sql: str, catalog: dict[str, Any], row_limit: int) -> str:
         if isinstance(node, forbidden):
             raise GuardError(f"Forbidden SQL node: {node.__class__.__name__}")
 
+    # Function allowlist (deny-by-default) — blocks query_to_xml/database_to_xml/dblink/
+    # pg_read_file/pg_sleep etc. that the table/column/LIMIT checks never inspect.
+    for func in expression.find_all(exp.Func):
+        fname = _func_name(func)
+        if any(bad in fname for bad in _BLOCKED_FUNC_SUBSTR):
+            raise GuardError(f"Dangerous function is not allowed: {fname}")
+        # Deny-by-default only for UNMODELED (Anonymous) functions — that is where the
+        # dangerous Postgres functions live (database_to_xml, dblink, pg_read_file, …).
+        # Modeled funcs/operators (sum, count, cast, and, date_trunc, …) are standard SQL.
+        if isinstance(func, exp.Anonymous) and fname not in _ALLOWED_FUNCS:
+            raise GuardError(f"Function is not allowed: {fname}")
+
     allowed_tables = {name.casefold() for name in catalog["tables"]}
     cte_names = {cte.alias.casefold() for cte in expression.find_all(exp.CTE) if cte.alias}
     for table in expression.find_all(exp.Table):
         name = table.name.casefold()
         if name in cte_names:
             continue
+        if table.db or table.catalog:  # block schema/db qualifiers (e.g. other_schema.einvoice)
+            raise GuardError(f"Schema-qualified table is not allowed: {table.sql(dialect='postgres')}")
         if name not in allowed_tables:
             raise GuardError(f"Table is not allowed: {table.name}")
 
@@ -244,6 +294,8 @@ def guard_sql(sql: str, catalog: dict[str, Any], row_limit: int) -> str:
         if column.name == "*":
             continue
         name = column.name.casefold()
+        if name in _SYSTEM_COLUMNS:
+            raise GuardError(f"System column is not allowed: {column.name}")
         if name not in known_columns and name not in aliases and not column.table:
             raise GuardError(f"Column is not in catalog: {column.name}")
         if name not in known_columns and column.table and column.table.casefold() not in aliases:
@@ -269,6 +321,13 @@ def execute_readonly(dsn: str, sql: str, timeout_ms: int) -> tuple[list[str], li
         conn.set_session(readonly=True, autocommit=False)
         with conn.cursor() as cur:
             cur.execute("SET statement_timeout = %s", (timeout_ms,))
+            # Defense in depth: drop to a least-privilege role (SELECT on the two catalog
+            # tables only, non-superuser) so even a guard bypass cannot write, read other
+            # tables, or use superuser-only functions. No-op if the role isn't installed.
+            if DB_ROLE and _ROLE_RE.match(DB_ROLE):
+                cur.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (DB_ROLE,))
+                if cur.fetchone():
+                    cur.execute(f"SET ROLE {DB_ROLE}")
             cur.execute(sql)
             columns = [desc.name for desc in cur.description]
             rows = [[_json_safe(value) for value in row] for row in cur.fetchall()]

@@ -41,6 +41,31 @@ def test_guard_allows_select_and_injects_limit():
     assert "LIMIT" in sql.upper()
 
 
+@pytest.mark.parametrize("attack", [
+    "SELECT database_to_xml(true, false, '')",                       # whole-DB exfiltration
+    "SELECT query_to_xml('SELECT * FROM taxpayer', true, false, '')",
+    "SELECT pg_read_file('/etc/passwd')",                            # arbitrary file read
+    "SELECT lo_import('/etc/passwd')",
+    "SELECT total_amount FROM einvoice WHERE pg_sleep(10) IS NULL",  # DoS
+    "SELECT total_amount FROM einvoice WHERE supplier_tin = dblink('h', 'SELECT 1')",
+    "SELECT total_amount FROM secret_schema.einvoice",               # schema-qualifier bypass
+    "SELECT ctid FROM einvoice",                                     # system column
+])
+def test_guard_blocks_dangerous(attack):
+    with pytest.raises(GuardError):
+        guard_sql(attack, CAT, 1000)
+
+
+def test_guard_allows_aggregates_and_dates():
+    # Legitimate analytics SQL (aggregates, date_trunc, date arithmetic) must NOT be blocked.
+    guard_sql(
+        "SELECT date_trunc('month', einvoice_date) m, sum(total_amount) FROM einvoice "
+        "WHERE supplier_tin = '1' AND einvoice_date > DATE '2026-01-04' - INTERVAL '4 days' GROUP BY m",
+        CAT, 1000,
+    )
+    guard_sql("SELECT recipient_tin, round(avg(total_amount), 2) FROM einvoice GROUP BY recipient_tin", CAT, 1000)
+
+
 def test_catalog_tables():
     assert set(CAT["tables"]) == {"einvoice", "taxpayer"}
     assert len(CAT["tables"]["einvoice"]["columns"]) == 15
