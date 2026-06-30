@@ -25,7 +25,7 @@ If something's off, the script says exactly what.
 
 ## 1. The story (30-second framing)
 
-> "Two deliverables for the tax authority, in one app: ask the invoice data questions in plain Azerbaijani or English, and automatically classify invoice items (Good vs Service, product group, and HS commodity code). The classifier reaches **99% on a held-out test** with an open-weight model that runs on a single machine — private by default; the cloud is only an optional 'second opinion'."
+> "Two deliverables for the tax authority, in one app: ask the invoice data questions in plain Azerbaijani or English, and automatically classify invoice items as Good vs Service; for every Good, propose the HS commodity code from the full EQM catalogue. Good/Service classification is about **99%**, with exact HS codes confirmed by human review. The open-weight model runs on a single machine — private by default; the cloud is only an optional 'second opinion'."
 
 ---
 
@@ -38,9 +38,9 @@ If something's off, the script says exactly what.
    - Talking point: *same engine, both languages; and every query is checked by a safety guard — it can only run read-only SELECTs on whitelisted columns, so it can never modify the tax database.*
 
 ### Tab 2 — **Classify item** (Task 2)
-3. Click **"Syringe"** → **Good / MED.SYRINGES / HS 9018319000** (medical instruments), handled by the **local** tier.
-4. Click **"Bread"** → **Good / BAKERY**; **"Canned fish"** → **Good / CANNED FISH**; **"Service"** → **Service** (no HS code).
-   - Talking points: the **7-group**, the **HS commodity code**, and **which tier** handled it (local vs cloud) — the cost/quality routing is visible.
+3. Click **"Syringe"** → **Good / HS 9018** candidate family (medical instruments), handled by the **local** tier.
+4. Click **"Bread"** → **Good / HS 1905**; **"Canned fish"** → **Good / HS 1604**; **"Service"** → **Service** (no HS code).
+   - Talking points: the **HS commodity code**, the **full 11,641-code EQM catalogue**, and **which tier** handled it (local vs cloud) — the cost/quality routing is visible.
 
 ### Tab 3 — **Evals**
 5. Show the **model-comparison chart + table**: a small local model with retrieval hits **99%** (★ best local), matching the big cloud model.

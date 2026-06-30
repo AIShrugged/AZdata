@@ -81,21 +81,21 @@ Returns `{question, provider, model, reference_date, sql, raw_sql, columns, rows
 - `embed_texts(texts)` → BGE-M3 vectors via Ollama `/api/embed` (batched).
 - `build_index(rows, prefix)` / `load_index(prefix)` → `*_index.npy` (float32 matrix, L2-normalised on load) + `*.meta.json`.
 - `retrieve(text, emb, meta, k)` → top-k by cosine (float64 matmul, FP flags suppressed).
-- `build_rag_prompt(text, examples, instructions=None)` → the classifier instruction (default `DEFAULT_INSTRUCTIONS`, or an optimised override) + the 7 group hints + the retrieved few-shot examples.
-- `classify_rag(text, emb, meta, k, provider, model, instructions) -> {label, group, confidence, ok}`.
+- `build_rag_prompt(text, examples, instructions=None)` → the classifier instruction (default `DEFAULT_INSTRUCTIONS`, or an optimised override) + the retrieved few-shot examples.
+- `classify_rag(text, emb, meta, k, provider, model, instructions) -> {label, confidence, ok}`.
 
 ### 4.2 Base classifier (`src/classify.py`)
-`classify()` (no retrieval) + the shared `GROUPS`, `GROUP_HINTS`, `extract_json`, `normalize` used by RAG. Useful as a baseline/ablation.
+`classify()` (no retrieval) + shared `extract_json` / `normalize` helpers used by RAG. Useful as a baseline/ablation.
 
-### 4.3 EQM HS-code (`src/eqm.py`) — *LLM-first*
-Pure embedding search fails (product names don't resemble formal HS text). Instead:
-1. `predict_headings(item, group)` — the LLM proposes the 1–3 most likely **4-digit HS headings** (it knows "syringe → 9018").
-2. Filter the 9,957-code registry (`load_eqm_index`) to those headings; fall back to embedding retrieval if none.
-3. Rerank the candidates with the LLM → the exact 10-digit `code` + confidence. The query text is cleaned (brand/size noise stripped) before any embedding step.
+### 4.3 EQM HS-code (`src/eqm.py`) — *retrieval + LLM rerank*
+Pure embedding search is not enough because product names often do not resemble formal HS text. The current pipeline:
+1. Retrieves candidates from the full enriched EQM registry index (**11,641 active codes**) built from descriptions plus brand/synonym keywords.
+2. Expands the query and uses a wider candidate pool (`k=60`) so hard items keep the likely HS code in the candidate set.
+3. Reranks candidates with the LLM → the exact 10-digit `code` + confidence. A Tier-2 auto-resolver can use LLM knowledge and optional privacy-gated web lookup, and the learning loop feeds confirmed codes back into retrieval.
 
 ### 4.4 Two-tier router & full pipeline (`src/router.py`)
 - `classify_route(...)` — run the **local** model; if `ok` and `confidence ≥ threshold` keep it (`tier="local"`), else re-run on the **strong** model (`tier="strong"`, `escalated=True`).
-- `classify_item(...)` — `classify_route` then, for Goods, `eqm.assign_code` → `{item, label, group, hs_code, hs_description, tier, escalated, confidence}`. This is exactly what `POST /classify` returns.
+- `classify_item(...)` — `classify_route` then, for Goods, `eqm.assign_code` → `{item, label, hs_code, hs_description, tier, escalated, confidence}`. This is exactly what `POST /classify` returns.
 Defaults: `LOCAL=qwen/qwen3.5-35b-a3b`, `STRONG=qwen/qwen3.5-122b-a10b`, `THRESHOLD=0.9`, `K=16`, provider `openrouter`.
 
 ---
@@ -117,9 +117,9 @@ write best → data/processed/best_instructions.txt
 
 ## 6. Evaluation
 
-- `scripts/eval_task2.py` — runs the classifier over a labelled CSV, prints label/group/fully-correct accuracy, the Good/Service confusion matrix, per-group recall, and saves misclassifications.
-- The held-out evaluation runs the **best config** over the untouched `test.csv` (1,298 items) — the numbers in the README/report.
-- `scripts/build_eval_summary.py` consolidates everything into `data/processed/eval_summary.json` (model comparison, journey, per-group, confusion, misclassified examples) which `GET /evals` serves to the **Evals** tab.
+- `scripts/eval_task2.py` — runs the classifier over a labelled CSV, prints Good/Service accuracy and the confusion matrix, and saves misclassifications.
+- HS-code evaluation reports retrieval recall@k on hard items plus heading/chapter agreement against the world-knowledge gold built by `scripts/gold_build.py`.
+- `scripts/build_eval_summary.py` consolidates everything into `data/processed/eval_summary.json` (model comparison, journey, HS-code retrieval evidence, confusion, misclassified examples) which `GET /evals` serves to the **Evals** tab.
 
 ---
 
@@ -163,7 +163,7 @@ Large derived artifacts (vector indexes, big CSVs) are git-ignored and rebuilt l
 ## 10. How to extend
 
 - **New invoice query vocabulary (Task 1):** edit `config/metadata_enrichment.yaml` (concepts/synonyms) and/or `db/schema.sql` COMMENTs → `python src/catalog.py`.
-- **New product group (Task 2):** add labelled examples → rebuild `labeled_items.csv`, splits, and the RAG index; add the group to `classify.GROUPS`/`GROUP_HINTS`; optionally re-run `optimize_prompt.py`.
+- **New HS catalogue coverage (Task 2):** add confirmed examples and synonyms → rebuild `labeled_items.csv`, splits, and the RAG/EQM indexes; optionally re-run `optimize_prompt.py`.
 - **New / different model:** set `AZDATA_LLM_PROVIDER` + `AZDATA_LLM_MODEL`, or pass `local_model`/`strong_model` to the router / `provider` to `/query`.
 - **Swap the cloud provider:** add a branch in `nlsql.call_llm` (the OpenRouter branch is the template) or just point `openrouter`'s model id elsewhere.
 - **Tune cost/quality:** raise/lower the router `threshold` (more escalation = more accuracy + more cost).
@@ -192,4 +192,4 @@ See [`AUDIT.md`](AUDIT.md) for the findings these address. The defaults keep the
 | `AZDATA_EMBED_TIMEOUT` / `AZDATA_LLM_RETRIES` | 120 / 3 | embedding request timeout; transient-only retry budget |
 
 - **SQL safety is now layered:** the `guard_sql` function allowlist + schema/system-column rejection, *and* the `azdata_ro` DB role (SELECT on the two tables only, non-superuser) — so a guard bypass still cannot write, read other tables, or use superuser functions.
-- **Eval is reproducible & leak-free:** `scripts/make_splits.py` asserts zero train↔eval text overlap; `scripts/eval_clean.py` reports micro **and** macro; `scripts/eval_eqm.py` measures HS-code accuracy against `data/processed/eqm_gold.csv`.
+- **Eval is reproducible & leak-free:** `scripts/make_splits.py` asserts zero train↔eval text overlap; `scripts/eval_task2.py` reports Good/Service accuracy; HS-code checks report retrieval recall@k plus heading/chapter agreement against the world-knowledge gold from `scripts/gold_build.py`.

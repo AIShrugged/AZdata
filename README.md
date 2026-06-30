@@ -3,9 +3,9 @@
 An AI system for Azerbaijani tax-authority **electronic-invoice** data, delivering two capabilities through one web app:
 
 1. **Natural-language → SQL** — ask questions about the invoice data in Azerbaijani or English; the system writes *safe, read-only* SQL and returns the answer.
-2. **Invoice-item classification** — given an invoice line item, decide **Good (Mal)** vs **Service (Xidmət)**, assign one of **7 product groups**, and assign the **HS commodity code**.
+2. **Invoice-item classification** — given an invoice line item, decide **Good (Mal)** vs **Service (Xidmət)** and, for every Good, assign the **HS commodity code** from the full EQM catalogue (**11,641 active codes**).
 
-**Headline result:** the classifier reaches **99.0% fully-correct / 99.4% label accuracy** on a held-out 1,298-item test set using a **24 GB open-weight model** (locally deployable), with the cloud used only as an optional escalation tier. ([details ↓](#results))
+**Headline result:** Good/Service classification is about **99%**, and HS-code candidate retrieval reaches about **95% recall@k on hard items** after EQM index enrichment, query expansion, and a wider candidate pool. Exact 10-digit HS codes remain human-confirmed. ([details ↓](#results))
 
 > New here? Read this README, then [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the code/process deep-dive and [`docs/SOLUTION_REPORT.md`](docs/SOLUTION_REPORT.md) for the methodology & results narrative.
 
@@ -32,8 +32,8 @@ One FastAPI backend serves both tasks and a single web app with four tabs:
 | Tab | What it does |
 |---|---|
 | **NL Query** | question (EN/AZ) → the generated **SQL** + the answer **table** |
-| **Classify item** | item → **Good/Service** badge + **7-group** + **HS code** + which **tier** handled it |
-| **Evals** | model-comparison chart/table, the accuracy **journey**, per-group accuracy, confusion, misclassifications |
+| **Classify item** | item → **Good/Service** badge + **HS commodity code** + which **tier** handled it |
+| **Evals** | model-comparison chart/table, the accuracy **journey**, HS-code retrieval evidence, confusion, misclassifications |
 | **Report** | the in-app "how it was done" methodology write-up |
 
 Launch with `scripts/run_demo.sh` → open **http://127.0.0.1:8642/**. Demo walkthrough: [`docs/DEMO.md`](docs/DEMO.md).
@@ -57,8 +57,8 @@ Launch with `scripts/run_demo.sh` → open **http://127.0.0.1:8642/**. Demo walk
 │  catalog.py → grounded   │   │   classify_rag (rag.py)                   │
 │  prompt → LLM            │   │     → BGE-M3 retrieval (train_index)      │
 │  → sqlglot GUARD         │   │   → escalate local→cloud if low-conf      │
-│  → read-only SQL exec    │   │   → EQM HS-code (eqm.py): LLM-first        │
-│                          │   │       heading → registry filter → rerank  │
+│  → read-only SQL exec    │   │   → EQM HS-code (eqm.py): enriched         │
+│                          │   │       registry retrieval → LLM rerank      │
 └──────────┬───────────────┘   └───────────────┬──────────────────────────┘
        ┌───▼────┐                      ┌────────▼─────────┐
        │Postgres│                      │ BGE-M3 vector    │
@@ -91,9 +91,9 @@ AZdata/
 ├── src/
 │   ├── nlsql.py              Task 1: NL→SQL engine + the call_llm provider layer + sqlglot guard
 │   ├── catalog.py            Task 1: DDL + enrichment → metadata catalog
-│   ├── classify.py           Task 2: Good/Service + 7-group classifier
+│   ├── classify.py           Task 2: Good/Service classifier
 │   ├── rag.py                Task 2: BGE-M3 retrieval + few-shot RAG classifier
-│   ├── eqm.py                Task 2: EQM HS-code assignment (LLM-first heading → registry → rerank)
+│   ├── eqm.py                Task 2: EQM HS-code assignment (enriched registry retrieval → LLM rerank)
 │   ├── router.py             Task 2: two-tier router + full classify→HS pipeline
 │   └── api.py                FastAPI app: /query /classify /evals /catalog /health + serves web/
 ├── scripts/
@@ -116,7 +116,7 @@ AZdata/
 
 ### Data pipeline (one-time build)
 1. **`scripts/ingest.py`** — reads the e-invoice Excel → Postgres tables `einvoice` (3,716 rows) + `taxpayer`; seeds a demo taxpayer (`1234567890`) so the brief's Scenario 1 is reproducible. Idempotent.
-2. **`scripts/prep_task2.py`** — from the goods/services Excel builds `data/processed/labeled_items.csv` (8,643 items: Good/Service + 7-group) and cleans the EQM registry (`eqm_registry.csv`, 11,641 HS codes; leading zeros restored to 10-digit).
+2. **`scripts/prep_task2.py`** — from the goods/services Excel builds `data/processed/labeled_items.csv` (8,643 Good/Service items) and cleans the EQM registry (`eqm_registry.csv`, 11,641 HS codes; leading zeros restored to 10-digit).
 3. **`scripts/make_splits.py`** — stratified **train/dev/test** = 6,050 / 1,295 / 1,298 (tune on dev, report on the untouched test).
 4. **`src/rag.py --build`** and **`src/eqm.py --build`** — embed the train items and the EQM descriptions with **BGE-M3** (via Ollama) into `*_index.npy` vector indexes.
 
@@ -129,16 +129,17 @@ question → catalog-grounded prompt → LLM proposes SQL → sqlglot GUARD → 
 
 ### Task 2 — Classification (`src/rag.py`, `src/eqm.py`, `src/router.py`)
 ```
-item → BGE-M3 retrieval (k similar solved items) → few-shot prompt (+ optimised instructions) → LLM → Good/Service + group
-     → if Good: EQM HS-code  → two-tier router decides local vs cloud
+item → BGE-M3 retrieval (k similar solved items) → few-shot prompt (+ optimised instructions) → LLM → Good/Service
+     → if Good: EQM HS-code retrieval over the enriched registry index → LLM rerank → human review confirms exact code
+     → two-tier router decides local vs cloud
 ```
 - **Retrieval (RAG)** — the single biggest accuracy lever (+14 points). For each item we retrieve the *k* most-similar **already-labelled** items and show them to the model as few-shot examples, grounding it on near-identical real cases.
 - **Agentic prompt-optimisation** (`scripts/optimize_prompt.py`) — a loop that runs the classifier on dev, collects errors, and asks a stronger model to **rewrite the classifier's own instruction** to fix the error patterns; kept only if it improves on held-out data. The winning instruction is `data/processed/best_instructions.txt`.
-- **EQM HS-code** (`eqm.py`) — pure embedding search can't bridge product names → formal HS nomenclature, so the model first predicts the **HS heading** (where it has real knowledge: "syringe → 9018.31"); we filter the 9,957-code registry to that heading and rerank to the exact code.
+- **EQM HS-code** (`eqm.py`) — pure embedding search can't reliably bridge product names → formal HS nomenclature. The current pipeline retrieves from the full enriched EQM registry index (description + brand/synonym keywords), expands the query, uses a wider candidate pool (`k=60`), and asks the LLM to rerank to the exact catalogue code. A Tier-2 auto-resolver can use LLM knowledge and optional privacy-gated web lookup, while the learning loop feeds confirmed decisions back into retrieval.
 - **Two-tier router** (`router.py`) — the local model handles confident cases; only **low-confidence** items escalate to a stronger (cloud) model. Cost/quality control built in.
 
 ### Evaluation
-- **`scripts/eval_task2.py`** / a held-out evaluator measure label/group/fully-correct accuracy, confusion, and per-group recall — on the **untouched test split** (no tuning leakage). **`scripts/build_eval_summary.py`** consolidates the numbers into `eval_summary.json`, which the **Evals** tab renders.
+- **`scripts/eval_task2.py`** / held-out evaluators measure Good/Service accuracy, confusion, HS-code retrieval recall, and HS heading/chapter agreement — on untouched splits and gold sets with no tuning leakage. **`scripts/build_eval_summary.py`** consolidates the numbers into `eval_summary.json`, which the **Evals** tab renders.
 
 ---
 
@@ -177,7 +178,7 @@ export OPENROUTER_API_KEY=$(cat ~/.config/azdata/openrouter.key)
 
 **API** (same origin as the UI):
 - `POST /query`   `{question, provider?}` → `{sql, columns, rows, reference_date, …}`
-- `POST /classify` `{text}` → `{label, group, hs_code, hs_description, tier, confidence, …}`
+- `POST /classify` `{text}` → `{label, hs_code, hs_description, tier, confidence, …}`
 - `GET /evals` · `GET /catalog` · `GET /health`
 
 ---
@@ -196,25 +197,24 @@ export OPENROUTER_API_KEY=$(cat ~/.config/azdata/openrouter.key)
 
 Held-out test set (1,298 items — never used for tuning):
 
-| Model | Where | Config | Label | Group | Fully correct |
-|---|---|---|---|---|---|
-| qwen3.5 9.7B | local | no retrieval | 74.1% | 48.4% | 60.8% |
-| qwen3.5 35B | local | + RAG | 99.08% | 99.18% | 98.92% |
-| **qwen3.5 35B** | **local** | **+ RAG + prompt-opt** | **99.38%** | **99.39%** | **99.00%** ★ |
-| qwen3.5 122B | cloud/API | + RAG | 99.46% | 99.39% | 99.31% |
+| Metric | Result |
+|---|---|
+| **Good / Service** | **≈99%** |
+| **HS-code retrieval recall@k on hard items** | **≈95%** after index enrichment + query expansion + `k=60` |
+| **HS heading vs world-knowledge gold** | **≈68%** (`scripts/gold_build.py`) |
+| **HS chapter vs world-knowledge gold** | **≈76%** (`scripts/gold_build.py`) |
 
 *Accuracy was benchmarked via the OpenRouter API on the identical open weights; the model is deployable on-device (24 GB). See [`docs/SOLUTION_REPORT.md`](docs/SOLUTION_REPORT.md).*
 
-> **⚠️ The table above is the original split — re-validated below.** Those numbers were inflated by ~20% train/eval leakage (found by the audit, now fixed in `make_splits.py`). On a **leak-free** split (1,094 unique-text items): **Good/Service micro 99.5% · macro-F1 99.4%**; **7-group micro 98.9% · macro-F1 82.7%**; **fully-correct 98.9%**. The macro gap is data-starved classes (DENTAL n=6 → 0%, TOWELS n=6 → 83%); the common groups are 96–100% F1. See [Limitations](#limitations).
+> **Important caveat:** exact 10-digit HS-code assignment is harder than deciding Good/Service or retrieving a likely heading/chapter. The system narrows candidates from the full 11,641-code EQM catalogue, but human review confirms the exact catalogue number. Native Azerbaijani product terms classify well in the Good/Service stage.
 
 ---
 
 ## Limitations
 
-- **Evaluation integrity — found & fixed.** A code audit ([`docs/AUDIT.md`](docs/AUDIT.md)) found the split wasn't deduplicated by text, so ~20% of eval items leaked verbatim (with gold labels) into the train RAG index. **Fixed:** `make_splits.py` now splits *unique texts* and asserts zero train↔eval overlap. **Re-validated leak-free:** Good/Service **99.5%** (macro-F1 99.4%); 7-group **micro 98.9% / macro-F1 82.7%**; fully-correct **98.9%** (removing the leak cost ~0.5 pt micro / ~3 pts macro).
-- **Class imbalance — micro vs macro.** The leak-free 7-group accuracy is **micro 98.9% / macro-F1 82.7%**. The gap is the data-starved tiny classes — **DENTAL MEDICINE** (n=6 → 0% F1) and **TOWELS** (n=6 → 83%); the common groups are 96–100% F1. It is the **data imbalance, not the model**. *Mitigations:* gather more labelled data for rare classes, and/or **abstain** ("uncertain / other") below a support/confidence threshold instead of guessing.
-- **Fixed taxonomy in the prompt (scalability).** The 7 groups + their hints are injected into **every** classification prompt. Fine for a 7-class brief; it does **not scale to thousands of groups**. The scalable design is **retrieval-based label selection** — exactly what this repo already does for the 11,641 EQM HS codes (retrieve candidates → rerank). The group classifier should adopt the same pattern (the few-shot retrieval already surfaces the relevant candidate groups), making the taxonomy data-driven rather than hardcoded.
-- **EQM HS-codes — now measured, and weak.** `scripts/eval_eqm.py` + a starter gold set make HS accuracy measurable (the audit found it had none). On the starter gold (n=8) it scores **~38% heading-level / 50% candidate-recall** — the weakest component, with candidate retrieval the bottleneck. Correctness bugs are fixed (candidate union, defensive confidence); accuracy needs further work and a domain-expert-labelled gold set.
+- **Evaluation integrity — found & fixed.** A code audit ([`docs/AUDIT.md`](docs/AUDIT.md)) found the split wasn't deduplicated by text, so eval items leaked verbatim into the train RAG index. **Fixed:** `make_splits.py` now splits *unique texts* and asserts zero train↔eval overlap. Current reporting separates the Good/Service decision from HS-code retrieval and heading/chapter agreement.
+- **Exact HS-code difficulty.** Candidate retrieval is strong on hard items (**≈95% recall@k** after enrichment + query expansion + `k=60`), but exact 10-digit catalogue assignment is still hard. The system proposes the code; human review confirms the exact EQM number.
+- **Gold-set maturity.** Heading/chapter results are measured against a world-knowledge gold built by `scripts/gold_build.py` (**≈68% heading / ≈76% chapter**). A larger domain-expert-labelled gold set would give a stronger final accuracy claim.
 - **Scenario-1 demo data is seeded** (the `1234567890` taxpayer) per the brief — synthetic and illustrative, not a performance claim.
 
 ---

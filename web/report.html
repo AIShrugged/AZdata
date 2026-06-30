@@ -237,7 +237,7 @@
       <p>A single web application that delivers two capabilities for Azerbaijani tax-authority e-invoice data:</p>
       <ul>
         <li><strong>Task 1 — Natural-language → SQL.</strong> Ask a question in Azerbaijani or English about the e-invoice data; the system writes safe SQL against a metadata catalog and returns the answer.</li>
-        <li><strong>Task 2 — Invoice-item classification.</strong> Given an invoice line item, decide <strong>Good (Mal)</strong> vs <strong>Service (Xidmət)</strong>, assign one of <strong>7 product groups</strong> (for Goods), and assign the <strong>HS commodity code</strong>.</li>
+        <li><strong>Task 2 — Invoice-item classification.</strong> Given an invoice line item, decide <strong>Good (Mal)</strong> vs <strong>Service (Xidmət)</strong> and, for every Good, assign the <strong>HS commodity code</strong> from the full EQM catalogue (<strong>11,641 active codes</strong>).</li>
       </ul>
       <p>Both are served by one backend (FastAPI) and one web app (three working tabs + this report).</p>
     </section>
@@ -251,7 +251,7 @@ FastAPI  /query  /classify  /evals  /health  /catalog
 NL→SQL engine                  Two-tier router
   catalog-grounded prompt        RAG classify (BGE-M3 few-shot)
   → sqlglot GUARD                → escalate local→cloud if unsure
-  → read-only SQL                → EQM HS-code (LLM-first)
+  → read-only SQL                → EQM HS-code (retrieval + rerank)
    │                                │
 Postgres (einvoice, taxpayer)   BGE-M3 vector indexes
         └──────── Model/provider layer ────────┘
@@ -270,74 +270,54 @@ Postgres (einvoice, taxpayer)   BGE-M3 vector indexes
 
     <section>
       <h2>4. Task 2 — Invoice-item classification</h2>
-      <p>The headline result: a <strong>24 GB open-weight model</strong> (<code>qwen3.5-35b-a3b</code>) reaches <strong>99% accuracy</strong> on a held-out test set. It is <strong>deployable fully on-device</strong> — 24 GB fits the target 128 GB machine — so the solution can run <strong>private</strong>, with the cloud used only as an optional escalation tier.</p>
+      <p>The headline result: a <strong>24 GB open-weight model</strong> (<code>qwen3.5-35b-a3b</code>) reaches about <strong>99% accuracy</strong> on the Good/Service decision. For Goods, HS-code candidate retrieval reaches about <strong>95% recall@k on hard items</strong> after EQM index enrichment, query expansion, and a wider candidate pool. It is <strong>deployable fully on-device</strong> — 24 GB fits the target 128 GB machine — so the solution can run <strong>private</strong>, with the cloud used only as an optional escalation tier.</p>
       <blockquote>
         <p><em>Note on how this was measured:</em> we benchmarked the model via the <strong>OpenRouter API</strong> for fast iteration. The weights are identical to a local Ollama deployment, so accuracy is a property of the model + method, not of where it runs. The embedding model (BGE-M3) already runs locally. For a fully-offline deployment, the 35B model is downloaded to Ollama (a one-time 24 GB pull); the 9.7B variant is already local.</p>
       </blockquote>
       <p><strong>How we got there (the journey):</strong></p>
       <ol>
-        <li><strong>Baseline.</strong> A small local model alone classified poorly (~60–74% fully-correct) — it confused medical goods, utilities, and cryptic product SKUs.</li>
-        <li><strong>+ Retrieval (RAG).</strong> We index every labelled example with <strong>BGE-M3 embeddings</strong>; at classification time we retrieve the <em>k</em> most-similar <strong>already-solved</strong> items and show them to the model as few-shot examples. This grounds the model on near-identical real cases and lifted fully-correct accuracy to <strong>98.9%</strong> (+14 points) — the single biggest lever.</li>
-        <li><strong>+ Agentic prompt-optimisation.</strong> An automated loop runs the classifier on a dev set, collects the errors, and a stronger model <strong>rewrites the classifier's own instructions</strong> to fix the error patterns (e.g. "medical kits are Goods", "water/sewer utilities are Goods"). Kept only when it improved on held-out data. This closed the gap to <strong>99.0%</strong>.</li>
+        <li><strong>Baseline.</strong> A small local model alone classified poorly (~60–74% on early held-out runs) — it confused goods with services and struggled with cryptic product SKUs.</li>
+        <li><strong>+ Retrieval (RAG).</strong> We index every labelled example with <strong>BGE-M3 embeddings</strong>; at classification time we retrieve the <em>k</em> most-similar <strong>already-solved</strong> items and show them to the model as few-shot examples. This grounds the model on near-identical real cases and was the single biggest lever.</li>
+        <li><strong>+ Agentic prompt-optimisation.</strong> An automated loop runs the classifier on a dev set, collects the errors, and a stronger model <strong>rewrites the classifier's own instructions</strong> to fix the error patterns. Kept only when it improved on held-out data. This closed the Good/Service decision to about <strong>99%</strong>.</li>
       </ol>
-      <p><strong>HS commodity code (EQM).</strong> Pure embedding search couldn't bridge product names → formal HS nomenclature (a syringe doesn't lexically resemble the HS-9018 wording). The fix is <strong>LLM-first</strong>: the model predicts the likely <strong>HS heading</strong> (where it has real knowledge — "syringe → 9018.31"), we filter the <strong>9,957-code registry</strong> to that heading, then rerank to the exact code. Medical items now map correctly (syringes → 9018.31, catheters → 9018.39).</p>
+      <p><strong>HS commodity code (EQM).</strong> Pure embedding search couldn't reliably bridge product names → formal HS nomenclature. The current approach retrieves from the full enriched EQM registry index (<strong>11,641 active codes</strong>, with description + brand/synonym keywords), expands the query, uses a wider candidate pool (<code>k=60</code>), and asks the LLM to rerank candidates to the exact catalogue code. A Tier-2 auto-resolver can use LLM knowledge and optional privacy-gated web lookup, while the learning loop feeds confirmed decisions back into retrieval. HS-code retrieval recall@k is about <strong>95% on hard items</strong>; against the world-knowledge gold from <code>scripts/gold_build.py</code>, heading agreement is about <strong>68%</strong> and chapter agreement about <strong>76%</strong>. The exact 10-digit code remains hard, so human review confirms the final HS code.</p>
       <p><strong>Two-tier router.</strong> The local model handles confident cases; only <strong>low-confidence</strong> items escalate to a stronger (cloud) model — a built-in cost/quality control.</p>
-      <p><strong>In the UI:</strong> the <em>Classify item</em> tab shows label + group + HS code + which tier handled it; the <em>Evals</em> tab shows the full evidence.</p>
+      <p><strong>In the UI:</strong> the <em>Classify item</em> tab shows label + HS code + which tier handled it; the <em>Evals</em> tab shows the full evidence.</p>
     </section>
 
     <section>
-      <h2>5. Results (held-out test, 1,298 items — never used for tuning)</h2>
+      <h2>5. Results</h2>
+      <p>Current Task 2 validation separates the Good/Service decision from HS-code retrieval and heading/chapter agreement:</p>
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th scope="col">Model</th>
-              <th scope="col">Where</th>
-              <th scope="col">Config</th>
-              <th scope="col" class="percent">Label</th>
-              <th scope="col" class="percent">Group</th>
-              <th scope="col" class="percent">Fully correct</th>
+              <th scope="col">Metric</th>
+              <th scope="col">Result</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td>qwen3.5 9.7B</td>
-              <td>local</td>
-              <td>no retrieval</td>
-              <td class="percent">74.1%</td>
-              <td class="percent">48.4%</td>
-              <td class="percent">60.8%</td>
+              <td><strong>Good / Service</strong></td>
+              <td><strong>≈99%</strong></td>
             </tr>
             <tr>
-              <td>qwen3.5 35B</td>
-              <td>local</td>
-              <td>+ RAG</td>
-              <td class="percent">99.08%</td>
-              <td class="percent">99.18%</td>
-              <td class="percent">98.92%</td>
-            </tr>
-            <tr class="best-local">
-              <td><strong>qwen3.5 35B</strong></td>
-              <td><strong>local</strong></td>
-              <td><strong>+ RAG + prompt-opt</strong></td>
-              <td class="percent"><strong>99.38%</strong></td>
-              <td class="percent"><strong>99.39%</strong></td>
-              <td class="percent"><strong>99.00%</strong> ★</td>
+              <td><strong>HS-code retrieval recall@k on hard items</strong></td>
+              <td><strong>≈95%</strong> after index enrichment + query expansion + <code>k=60</code></td>
             </tr>
             <tr>
-              <td>qwen3.5 122B</td>
-              <td>cloud/API</td>
-              <td>+ RAG</td>
-              <td class="percent">99.46%</td>
-              <td class="percent">99.39%</td>
-              <td class="percent">99.31%</td>
+              <td><strong>HS heading vs world-knowledge gold</strong></td>
+              <td><strong>≈68%</strong> (<code>scripts/gold_build.py</code>)</td>
+            </tr>
+            <tr>
+              <td><strong>HS chapter vs world-knowledge gold</strong></td>
+              <td><strong>≈76%</strong> (<code>scripts/gold_build.py</code>)</td>
             </tr>
           </tbody>
         </table>
       </div>
-      <p>Good/Service (the core decision) is ~99.4% (macro-F1 99.2%). <strong>The 7-group figure above is micro-averaged</strong> and is dominated by BAKERY (~73% of Goods); the <strong>macro-F1 is 85.5%</strong>, because the data-starved <strong>DENTAL MEDICINE</strong> class (n=6 total; 1 in test) scores 0% while the other six groups score 99–100% F1. The honest headline for the 7-group task is <strong>micro 99.4% / macro 85.5%</strong>. All numbers reproduce on the untouched test split.</p>
       <blockquote>
-        <p><strong>Two honest limitations</strong> (see the README <em>Limitations</em> section for the full version): (1) the macro/micro gap above is a rare-class <strong>data-starvation</strong> problem (DENTAL, n=6) — fix with more data or an abstain option; (2) the 7 groups are <strong>hardcoded into every prompt</strong>, which is fine for 7 classes but does not scale to thousands — the scalable fix is retrieval-based label selection, the same pattern already used for the 11,641 EQM HS codes.</p>
+        <p><strong>Honest limitation:</strong> exact 10-digit HS-code assignment is the hard part. The system retrieves and reranks likely EQM candidates from the full catalogue, but human review confirms the exact catalogue number. Native Azerbaijani product terms classify well in the Good/Service stage.</p>
       </blockquote>
     </section>
 
@@ -347,7 +327,7 @@ Postgres (einvoice, taxpayer)   BGE-M3 vector indexes
         <li><strong>Local-first for privacy</strong> — the chosen models are <strong>open-weight and deployable on-device</strong> (tax data need never leave the machine); cloud is an optional escalation tier, not a hard dependency. Accuracy was benchmarked via API on the identical weights.</li>
         <li><strong>Small model + smart context beats raw size</strong> — retrieval (RAG) did most of the work; we did not need a giant model.</li>
         <li><strong>The model improves itself</strong> — the agentic prompt-optimisation loop writes better instructions from its own mistakes.</li>
-        <li><strong>Rigorous evaluation</strong> — proper train/dev/test split (6050/1295/1298), tuning only on dev, final numbers on an untouched test set, with misclassifications kept visible.</li>
+        <li><strong>Rigorous evaluation</strong> — train/dev/test separation for Good/Service, HS retrieval checks on hard items, and heading/chapter comparison against the <code>scripts/gold_build.py</code> gold set, with errors kept visible.</li>
         <li><strong>Safety by construction</strong> — the SQL guard is deterministic; the model is never trusted to "be safe".</li>
       </ul>
     </section>
