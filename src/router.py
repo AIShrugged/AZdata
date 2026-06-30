@@ -60,13 +60,11 @@ def classify_route(
     conf = float(chosen.get("confidence") or 0.0)
     needs_review = (
         bool(chosen.get("needs_review"))                          # model flagged it
-        or chosen.get("group") == "OTHER"                         # out-of-taxonomy good
         or (bool(chosen.get("ok")) and conf < REVIEW_THRESHOLD)   # low confidence after routing
         or not chosen.get("ok")                                   # parse / total failure
     )
     result = {
         "label": chosen.get("label"),
-        "group": chosen.get("group"),
         "confidence": chosen.get("confidence"),
         "is_mixed": bool(chosen.get("is_mixed")),
         "needs_review": needs_review,
@@ -102,7 +100,6 @@ def classify_item(
             item_text,
             eqm_emb,
             eqm_meta,
-            group=(c.get("group") if c.get("group") not in (None, "OTHER") else None),
             provider=route_kwargs.get("provider", PROVIDER),
             model=route_kwargs.get("strong_model", STRONG_MODEL),
             web=web,  # privacy toggle for Tier-2 web lookup
@@ -113,7 +110,6 @@ def classify_item(
     out = {
         "item": item_text,
         "label": c["label"],
-        "group": c["group"],
         "hs_code": hs_code,
         "hs_description": hs_desc,
         "hs_candidates": hs_candidates,

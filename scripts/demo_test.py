@@ -68,11 +68,11 @@ cases = [
 ]
 for name, text, expected in cases:
     res = rag.classify_rag(text, emb, meta, k=16, provider=PROVIDER, model=LOCAL, instructions=instr)
-    check(name, res.get("label") == expected, f"got {res.get('label')}/{res.get('group')}")
+    check(name, res.get("label") == expected, f"got {res.get('label')}")
 
 print("== Task 2 · EQM HS-code ==")
 e_emb, e_meta = eqm.load_eqm_index()
-hs = eqm.assign_code("Şpris 10 ml rezin porşenli", e_emb, e_meta, k=20, provider=PROVIDER, model=STRONG, group="MED.SYRINGES")
+hs = eqm.assign_code("Şpris 10 ml rezin porşenli", e_emb, e_meta, k=20, provider=PROVIDER, model=STRONG)
 check("syringe -> HS heading 9018", str(hs.get("code")).startswith("9018"), f"got {hs.get('code')}")
 
 print("== Task 2 · two-tier router (full pipeline) ==")

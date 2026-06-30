@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from classify import GROUPS, GROUP_HINTS, extract_json, normalize
+from classify import extract_json, normalize
 from nlsql import DEFAULT_MODELS, PROVIDER as DEFAULT_PROVIDER, call_llm
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -98,10 +98,8 @@ def retrieve(query_text: str, emb: np.ndarray, meta: list[dict[str, Any]], k: in
 DEFAULT_INSTRUCTIONS = (
     "You classify Azerbaijani invoice line items. Decide if the item is a physical GOOD (Mal) "
     "or a SERVICE (Xidmət). Services are works/activities (construction, transport, repair, "
-    "installation, consulting); goods are physical products. If it is a Good, also assign exactly "
-    "one product group from the list; if it is a Service, group is null. Output ONLY one JSON "
-    'object, no prose, no markdown: {"label": "Good"|"Service", "group": <one of the groups '
-    'or null>, "confidence": <0..1>}. confidence = your probability the label+group are correct.'
+    "installation, consulting); goods are physical products. Output ONLY one JSON object, no prose, "
+    'no markdown: {"label": "Good"|"Service", "confidence": <0..1>}. confidence = your probability the label is correct.'
 )
 
 
@@ -109,27 +107,21 @@ POLICY = (
     "\n\nSpecial cases & FINAL output schema (these override any conflicting format above):\n"
     "- MIXED line — a physical good bundled with an ancillary service (delivery/çatdırılma, "
     "installation/quraşdırma): apply the PRIMARY-COMPONENT rule — the principal GOOD wins and the "
-    'ancillary service follows it. Set label="Good", group=the good\'s group, is_mixed=true, and list components.\n'
-    '- A GOOD that fits NONE of the 7 groups above: set group="OTHER".\n'
+    'ancillary service follows it. Set label="Good", is_mixed=true, and list components.\n'
     "- If you are NOT confident — unclear, garbled, a non-item/placeholder, or genuinely ambiguous — "
-    "set needs_review=true (still give your best label/group, using OTHER if no group fits).\n"
-    'Output ONLY one JSON object: {"label":"Good"|"Service","group":<one of the 7 groups | "OTHER" | null>,'
-    '"confidence":<0..1>,"is_mixed":<true|false>,"needs_review":<true|false>,'
+    "set needs_review=true (still give your best label).\n"
+    'Output ONLY one JSON object: {"label":"Good"|"Service","confidence":<0..1>,'
+    '"is_mixed":<true|false>,"needs_review":<true|false>,'
     '"components":[{"part":"...","kind":"Good"|"Service"}]}  (include components only when is_mixed is true).'
 )
 
 
 def build_rag_prompt(text: str, examples: list[dict[str, Any]], instructions: Optional[str] = None) -> tuple[str, str]:
     base = instructions if instructions is not None else DEFAULT_INSTRUCTIONS
-    group_lines = "\n".join(f"- {group}: {GROUP_HINTS[group]}" for group in GROUPS)
-    example_lines = []
-    for ex in examples:
-        suffix = f' / {ex["group"]}' if ex.get("group") else ""
-        example_lines.append(f'- "{ex["text"]}" -> {ex["label"]}{suffix}')
+    example_lines = [f'- "{ex["text"]}" -> {ex["label"]}' for ex in examples]
     system = (
         base
-        + f"\n\nProduct groups:\n{group_lines}\n\n"
-        + "Similar labeled examples (item -> answer):\n"
+        + "\n\nSimilar labeled examples (item -> Good/Service):\n"
         + "\n".join(example_lines)
         + POLICY
     )
@@ -154,7 +146,6 @@ def classify_rag(
         norm = normalize(extract_json(raw))
         return {
             "label": norm["label"],
-            "group": norm["group"],
             "confidence": norm["confidence"],
             "is_mixed": norm["is_mixed"],
             "needs_review": norm["needs_review"],
@@ -166,7 +157,6 @@ def classify_rag(
     except Exception as exc:
         return {
             "label": None,
-            "group": None,
             "confidence": 0.0,
             "ok": False,
             "provider": provider,

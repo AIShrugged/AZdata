@@ -9,7 +9,7 @@ import pytest
 import eqm
 import rag
 from catalog import build_catalog
-from classify import GROUPS, extract_json, normalize
+from classify import extract_json, normalize
 from nlsql import GuardError, extract_sql, guard_sql
 
 
@@ -79,22 +79,12 @@ def test_catalog_synonyms():
 
 
 def test_normalize_label_aliases():
-    assert normalize({"label": "Mal", "group": "BAKERY", "confidence": 0.9})["label"] == "Good"
+    assert normalize({"label": "Mal", "confidence": 0.9})["label"] == "Good"
     assert normalize({"label": "Xidmət"})["label"] == "Service"
 
 
-def test_normalize_group_guard():
-    assert normalize({"label": "Service", "group": "BAKERY"})["group"] is None
-    assert normalize({"label": "Good", "group": "NOT_A_GROUP"})["group"] is None
-    assert "BAKERY" in GROUPS
-
-
-def test_normalize_group_canonicalizes_case_and_space():
-    assert normalize({"label": "Good", "group": " bakery "})["group"] == "BAKERY"
-
-
 def test_extract_json_fenced():
-    data = extract_json('```json\n{"label":"Good","group":"BAKERY","confidence":0.8}\n```')
+    data = extract_json('```json\n{"label":"Good","confidence":0.8}\n```')
     assert data["label"] == "Good"
 
 

@@ -54,8 +54,6 @@ def classify_reason(result: dict) -> str:
     """Triage WHY an item needs review — drives where the reviewer routes it."""
     text = str(result.get("item") or result.get("text") or "").strip()
     conf = float(result.get("confidence") or 0.0)
-    if result.get("group") == "OTHER":
-        return "taxonomy_gap"          # a real good with no matching group
     if len(text) < 3 or conf < 0.3:
         return "data_error"            # garbled / placeholder / non-item
     if result.get("is_mixed"):
