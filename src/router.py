@@ -93,20 +93,22 @@ def classify_item(
 ) -> dict[str, Any]:
     c = classify_route(item_text, rag_emb, rag_meta, instructions, **route_kwargs)
     hs_code = hs_desc = None
+    hs_candidates: list[str] = []
     hs_review = False
-    # Skip HS for review-bound items (out-of-taxonomy / low confidence): the code would be
-    # unreliable and a human decides the item anyway.
-    if c["label"] == "Good" and assign_hs and not c.get("needs_review"):
+    # Assign the HS catalogue code for EVERY good — including out-of-7-groups items (a laptop, a desk):
+    # the exact catalogue code IS the deliverable, so we never skip it.
+    if c["label"] == "Good" and assign_hs:
         hs = eqm.assign_code(
             item_text,
             eqm_emb,
             eqm_meta,
-            group=c.get("group"),
+            group=(c.get("group") if c.get("group") not in (None, "OTHER") else None),
             provider=route_kwargs.get("provider", PROVIDER),
             model=route_kwargs.get("strong_model", STRONG_MODEL),
             web=web,  # privacy toggle for Tier-2 web lookup
         )
         hs_code, hs_desc = hs.get("code"), hs.get("description")
+        hs_candidates = [str(x) for x in hs.get("candidates", [])][:8]
         hs_review = bool(hs.get("needs_review"))  # low-confidence HS code → flag the item for review
     out = {
         "item": item_text,
@@ -114,6 +116,7 @@ def classify_item(
         "group": c["group"],
         "hs_code": hs_code,
         "hs_description": hs_desc,
+        "hs_candidates": hs_candidates,
         "is_mixed": c.get("is_mixed", False),
         "needs_review": c.get("needs_review", False) or hs_review,
         "components": c.get("components", []),

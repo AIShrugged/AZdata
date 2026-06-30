@@ -202,6 +202,7 @@ class ReviewResolveRequest(BaseModel):
     decision: str  # accept | correct | data_error
     corrected_label: Optional[str] = None
     corrected_group: Optional[str] = None
+    corrected_code: Optional[str] = None
     reviewer: Optional[str] = None
 
 
@@ -299,6 +300,10 @@ def classify(request: Request, req: ClassifyRequest) -> Any:
             web=req.web_search,
             **route_kwargs,
         )
+        cands = result.get("hs_candidates")
+        if cands and isinstance(cands[0], str):  # attach descriptions for the UI shortlist
+            _desc = {str(c.get("code")): c.get("description") for c in (EQM_META or [])}
+            result["hs_candidates"] = [{"code": c, "description": _desc.get(c, "")} for c in cands]
         if result.get("needs_review"):
             try:
                 review.enqueue(result)  # flagged items land in the human review queue
@@ -329,7 +334,7 @@ def review_queue(request: Request, status: str = "pending", limit: int = 100) ->
 def review_resolve(request: Request, req: ReviewResolveRequest) -> Any:
     _check_request(request)
     try:
-        out = review.resolve(req.id, req.decision, req.corrected_label, req.corrected_group, req.reviewer or "reviewer")
+        out = review.resolve(req.id, req.decision, req.corrected_label, req.corrected_group, req.corrected_code, req.reviewer or "reviewer")
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     _apply_correction_to_index(out.get("correction"))  # live RAG feedback

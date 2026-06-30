@@ -88,8 +88,8 @@
     .eval-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
     .review-stats{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:14px;color:#344054}
     .review-actions{display:flex;flex-wrap:wrap;gap:8px}.review-actions button{min-height:34px;min-width:0;padding:0 10px;font-size:13px}
-    .correct-form{display:grid;grid-template-columns:120px minmax(180px,1fr) auto;gap:8px;margin-top:10px}
-    .correct-form[hidden]{display:none}.correct-form select,.correct-form button{min-height:36px}
+    .correct-form{display:grid;grid-template-columns:minmax(180px,1fr) auto;gap:8px;margin-top:10px}
+    .correct-form[hidden]{display:none}.correct-form input,.correct-form button{min-height:36px}
     .flash{margin-bottom:14px;border:1px solid #abefc6;border-radius:8px;background:var(--green-bg);color:var(--green);padding:10px 12px;font-weight:700}
     .learned-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}
     .learned-head .review-actions{align-items:center;justify-content:flex-end}
@@ -271,18 +271,20 @@
       const label=String(data.label||"").toUpperCase(),isGood=label==="GOOD",tier=String(data.tier||"unknown");
       const cloud=/strong|cloud/i.test(tier),conf=Number(data.confidence),escalated=data.escalated?" · escalated":"";
       const needsReview=data.needs_review===true,mixed=data.is_mixed===true,components=Array.isArray(data.components)?data.components:[];
+      const candidates=Array.isArray(data.hs_candidates)?data.hs_candidates:[];
+      const hsCode=data.hs_code?escapeHTML(data.hs_code):"—",hsDescription=data.hs_description?` — ${escapeHTML(data.hs_description)}`:"";
       classifyOutput.innerHTML=`
         <div class="card result-card">
           <div>
-            <span class="badge ${isGood?"good":"service"}">${escapeHTML(label||"UNKNOWN")}</span>
+            <span class="badge ${isGood?"good":"service"}">HS code: ${hsCode}${hsDescription}</span>
+            ${label?`<span class="tag ${isGood?"local":"mixed"}">${escapeHTML(label)}</span>`:""}
             ${needsReview?`<span class="tag review">⚠ Needs review</span>`:""}
             ${needsReview?`<span class="muted small">→ queued for review</span>`:""}
             ${mixed?`<span class="tag mixed">Mixed</span>`:""}
           </div>
           <div class="facts">
-            ${data.group?`<div><strong>Group:</strong> ${escapeHTML(data.group)}</div>`:""}
-            ${data.hs_code?`<div><strong>HS code:</strong> ${escapeHTML(data.hs_code)}<span class="hs-desc">${escapeHTML(data.hs_description||"")}</span></div>`:""}
             ${mixed&&components.length?`<div><strong>Components:</strong> ${components.map(item=>`${escapeHTML(item.part||item.text||"part")} (${escapeHTML(item.kind||item.label||"unknown")})`).join(", ")}</div>`:""}
+            ${candidates.length?`<div><strong>Other candidate codes</strong><ul class="small">${candidates.map(item=>`<li>${escapeHTML(item.code||"—")} — ${escapeHTML(item.description||"")}</li>`).join("")}</ul></div>`:""}
           </div>
           <div class="footer">
             <span>handled by:</span><span class="tag ${cloud?"cloud":"local"}">${escapeHTML(tier)}</span>
@@ -359,27 +361,19 @@
       </div>`;
     }
     function renderCorrectForm(item){
-      const groups=["BAKERY","CANNED FISH","WIPES","MED.SYRINGES","TOWELS","PUBLIC UTILITIES WATER","DENTAL MEDICINE","OTHER"];
       return `<div class="correct-form" data-correct-form="${escapeHTML(item.id)}" hidden>
-        <select data-correct-label aria-label="Corrected label">
-          <option value="Good">Good</option>
-          <option value="Service">Service</option>
-        </select>
-        <select data-correct-group aria-label="Corrected group">
-          <option value=""></option>
-          ${groups.map(group=>`<option value="${escapeHTML(group)}">${escapeHTML(group)}</option>`).join("")}
-        </select>
+        <input data-correct-code aria-label="Corrected HS code" value="${escapeHTML(item.hs_code||"")}" placeholder="Correct HS code">
         <button type="button" data-review-action="save" data-id="${escapeHTML(item.id)}">Save</button>
       </div>`;
     }
     function renderReviewItems(items){
       if(!Array.isArray(items)||!items.length)return `<div class="empty">No items awaiting review.</div>`;
       const rows=items.map(item=>{
-        const conf=Number(item.confidence),prediction=[item.pred_label,item.pred_group].filter(Boolean).join(" / ");
+        const conf=Number(item.confidence),hsCode=item.hs_code?escapeHTML(item.hs_code):"—",hsDescription=item.hs_description?`<span class="hs-desc">${escapeHTML(item.hs_description)}</span>`:"";
         return `<tr>
           <td>${escapeHTML(item.text)}${item.is_mixed?` <span class="tag mixed">Mixed</span>`:""}</td>
           <td><span class="tag ${reasonClass(item.reason)}">${escapeHTML(item.reason||"unknown")}</span></td>
-          <td>${escapeHTML(prediction||"n/a")} <span class="muted small">(conf ${escapeHTML(Number.isFinite(conf)?conf.toFixed(2):"n/a")})</span></td>
+          <td><strong>${hsCode}</strong>${hsDescription} <span class="muted small">(conf ${escapeHTML(Number.isFinite(conf)?conf.toFixed(2):"n/a")})</span></td>
           <td>
             <div class="review-actions">
               <button class="ghost" type="button" data-review-action="accept" data-id="${escapeHTML(item.id)}">Accept</button>
@@ -390,7 +384,7 @@
           </td>
         </tr>`;
       }).join("");
-      return `<div class="table-wrap"><table><thead><tr><th>Item</th><th>Reason</th><th>Model prediction</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      return `<div class="table-wrap"><table><thead><tr><th>Item</th><th>Reason</th><th>HS code</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     }
     function renderLearnedItems(items){
       if(!Array.isArray(items)||!items.length)return `<div class="empty">Nothing learned yet.</div>`;
@@ -543,7 +537,7 @@
       }
       if(action==="save"){
         const form=button.closest(".correct-form");
-        resolveReview(button,{id,decision:"correct",corrected_label:form.querySelector("[data-correct-label]").value,corrected_group:form.querySelector("[data-correct-group]").value});
+        resolveReview(button,{id,decision:"correct",corrected_code:form.querySelector("[data-correct-code]").value});
         return;
       }
       resolveReview(button,{id,decision:action});

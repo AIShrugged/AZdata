@@ -38,10 +38,16 @@ def init_db() -> None:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 created_at TEXT, text TEXT UNIQUE, reason TEXT,
                 pred_label TEXT, pred_group TEXT, confidence REAL, is_mixed INTEGER,
+                hs_code TEXT, hs_description TEXT,
                 status TEXT DEFAULT 'pending',
-                corrected_label TEXT, corrected_group TEXT, reviewer TEXT, reviewed_at TEXT
+                corrected_label TEXT, corrected_group TEXT, corrected_code TEXT, reviewer TEXT, reviewed_at TEXT
             )"""
         )
+        for col in ("hs_code TEXT", "hs_description TEXT", "corrected_code TEXT"):  # migrate older DBs
+            try:
+                conn.execute(f"ALTER TABLE review_queue ADD COLUMN {col}")
+            except Exception:
+                pass
 
 
 def classify_reason(result: dict) -> str:
@@ -67,10 +73,11 @@ def enqueue(result: dict) -> Optional[int]:
         if row:
             return int(row["id"])  # de-dup: same item already queued
         cur = conn.execute(
-            "INSERT INTO review_queue (created_at,text,reason,pred_label,pred_group,confidence,is_mixed,status)"
-            " VALUES (?,?,?,?,?,?,?,'pending')",
+            "INSERT INTO review_queue (created_at,text,reason,pred_label,pred_group,confidence,is_mixed,hs_code,hs_description,status)"
+            " VALUES (?,?,?,?,?,?,?,?,?,'pending')",
             (_now(), text, classify_reason(result), result.get("label"), result.get("group"),
-             float(result.get("confidence") or 0.0), 1 if result.get("is_mixed") else 0),
+             float(result.get("confidence") or 0.0), 1 if result.get("is_mixed") else 0,
+             result.get("hs_code"), result.get("hs_description")),
         )
         return int(cur.lastrowid)
 
@@ -85,7 +92,8 @@ def list_queue(status: str = "pending", limit: int = 100) -> list[dict]:
 
 
 def resolve(item_id: int, decision: str, corrected_label: Optional[str] = None,
-            corrected_group: Optional[str] = None, reviewer: str = "reviewer") -> dict:
+            corrected_group: Optional[str] = None, corrected_code: Optional[str] = None,
+            reviewer: str = "reviewer") -> dict:
     """decision ∈ {accept, correct, data_error}. Returns the captured correction (if any)."""
     init_db()
     status = _DECISION_STATUS.get(decision)
@@ -97,15 +105,23 @@ def resolve(item_id: int, decision: str, corrected_label: Optional[str] = None,
             raise ValueError(f"no queue item {item_id}")
         final_label = corrected_label if decision == "correct" else row["pred_label"]
         final_group = corrected_group if decision == "correct" else row["pred_group"]
+        final_code = corrected_code if (decision == "correct" and corrected_code) else row["hs_code"]
         conn.execute(
-            "UPDATE review_queue SET status=?, corrected_label=?, corrected_group=?, reviewer=?, reviewed_at=? WHERE id=?",
-            (status, final_label, final_group, reviewer, _now(), item_id),
+            "UPDATE review_queue SET status=?, corrected_label=?, corrected_group=?, corrected_code=?, reviewer=?, reviewed_at=? WHERE id=?",
+            (status, final_label, final_group, final_code, reviewer, _now(), item_id),
         )
     correction = None
     if decision in ("accept", "correct") and final_label:  # data_error is NOT fed back
         correction = {"text": row["text"], "label": final_label, "group": (final_group or "")}
         _append_correction(correction)
-    return {"id": item_id, "status": status, "correction": correction}
+    # Human-confirmed HS code → feed the EQM learning loop so this item (and similar) retrieves it next time.
+    if decision == "correct" and corrected_code:
+        try:
+            import resolver
+            resolver.learn(row["text"], row["text"], code=str(corrected_code))
+        except Exception:
+            pass
+    return {"id": item_id, "status": status, "correction": correction, "hs_code": final_code}
 
 
 def _append_correction(corr: dict) -> None:
