@@ -39,6 +39,8 @@
     .pane{display:none}.pane.active{display:block}
     form{display:grid;grid-template-columns:1fr 180px auto;gap:10px;align-items:center}
     #classify-form{grid-template-columns:1fr auto}
+    .classify-option{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;color:#344054;font-size:13px}
+    .classify-option input{width:auto;min-height:0;margin:0}
     input,select,button{min-height:42px;border-radius:7px;font:inherit}
     input,select{width:100%;border:1px solid var(--line);background:#fff;color:var(--text);padding:0 12px;outline:none}
     input:focus,select:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(23,92,211,.14)}
@@ -155,6 +157,11 @@
         <form id="classify-form">
           <input id="item-text" required placeholder="Şpris 10 ml … · Nəqliyyat xidməti">
           <button id="classify-button" type="submit">Classify</button>
+          <label class="classify-option">
+            <input id="web-search-toggle" type="checkbox">
+            <span>🔎 Web lookup for hard items</span>
+            <span class="muted">off for privacy — sends the item text to an external search only when enabled</span>
+          </label>
         </form>
         <div class="examples" aria-label="Classification examples">
           <span class="examples-label">Examples:</span>
@@ -186,7 +193,7 @@
   </div>
   <script>
     const $=id=>document.getElementById(id);
-    const statusEl=$("status"),queryOutput=$("query-output"),classifyOutput=$("classify-output"),evalsOutput=$("evals-output"),reviewOutput=$("review-output");
+    const statusEl=$("status"),queryOutput=$("query-output"),classifyOutput=$("classify-output"),evalsOutput=$("evals-output"),reviewOutput=$("review-output"),webSearchToggle=$("web-search-toggle");
     let evalsLoaded=false,reviewFlash="";
 
     function escapeHTML(value){
@@ -388,6 +395,7 @@
     async function loadHealth(){
       try{
         const data=await getJSON("/health"),ready=data.task2_ready==null?"n/a":data.task2_ready;
+        webSearchToggle.checked=data.web_search_default===true;
         statusEl.innerHTML=`<span class="dot ok">●</span><span>ready · task2_ready: ${escapeHTML(ready)}</span>`;
       }catch(err){statusEl.innerHTML=`<span class="dot bad">●</span><span>${escapeHTML(errorMessage(err))}</span>`}
     }
@@ -443,7 +451,7 @@
       event.preventDefault();
       withButton($("classify-button"),"…",async()=>{
         classifyOutput.innerHTML="";
-        try{renderClassifyResult(await postJSON("/classify",{text:$("item-text").value}))}
+        try{renderClassifyResult(await postJSON("/classify",{text:$("item-text").value,web_search:webSearchToggle.checked}))}
         catch(err){showError(classifyOutput,err)}
       });
     });

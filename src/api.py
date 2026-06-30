@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from catalog import build_catalog
 from nlsql import PROVIDER as DEFAULT_PROVIDER, answer
-import rag, eqm, router, review
+import rag, eqm, router, review, resolver
 import numpy as np
 
 logging.basicConfig(level=logging.INFO)
@@ -162,6 +162,7 @@ class ClassifyRequest(BaseModel):
     local_model: Optional[str] = None
     strong_model: Optional[str] = None
     assign_hs: bool = True
+    web_search: Optional[bool] = None  # privacy: opt-in web lookup for hard items (None = server default, off)
 
 
 class ReviewResolveRequest(BaseModel):
@@ -178,6 +179,7 @@ def health() -> dict[str, Any]:
         "status": "ok",
         "default_provider": DEFAULT_PROVIDER,
         "task2_ready": TASK2_READY,
+        "web_search_default": resolver.web_enabled(),
     }
 
 
@@ -258,6 +260,7 @@ def classify(request: Request, req: ClassifyRequest) -> Any:
             EQM_META,
             INSTRUCTIONS,
             assign_hs=req.assign_hs,
+            web=req.web_search,
             **route_kwargs,
         )
         if result.get("needs_review"):

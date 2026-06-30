@@ -88,6 +88,7 @@ def classify_item(
     eqm_meta: list[dict[str, Any]],
     instructions: Optional[str],
     assign_hs: bool = True,
+    web: Optional[bool] = None,
     **route_kwargs: Any,
 ) -> dict[str, Any]:
     c = classify_route(item_text, rag_emb, rag_meta, instructions, **route_kwargs)
@@ -103,6 +104,7 @@ def classify_item(
             group=c.get("group"),
             provider=route_kwargs.get("provider", PROVIDER),
             model=route_kwargs.get("strong_model", STRONG_MODEL),
+            web=web,  # privacy toggle for Tier-2 web lookup
         )
         hs_code, hs_desc = hs.get("code"), hs.get("description")
         hs_review = bool(hs.get("needs_review"))  # low-confidence HS code → flag the item for review

@@ -115,6 +115,8 @@ def assign_code(
     provider: Optional[str] = None,
     model: Optional[str] = None,
     group: Optional[str] = None,
+    tier2: bool = True,
+    web: Optional[bool] = None,
 ) -> dict[str, Any]:
     provider = provider or DEFAULT_PROVIDER
     model = model or DEFAULT_MODELS.get(provider)
@@ -163,6 +165,30 @@ def assign_code(
         # Confidence must describe the code actually returned: parse defensively (a non-numeric
         # value like "high" no longer aborts the whole result) and zero it when we fell back to cands[0].
         confidence = _normalize_confidence(parsed.get("confidence")) if valid else 0.0
+        # TIER 2 (auto-resolve): if uncertain, resolve the brand/colloquial name to a generic product
+        # (LLM knowledge; optional web lookup behind the privacy toggle) and re-retrieve + re-rank ONCE.
+        # A successful resolution is LEARNED so the same pattern auto-resolves in Tier-1 next time.
+        if tier2 and confidence < 0.5:
+            import resolver
+            r = resolver.resolve(item_text, provider, model, web=web)
+            product = r.get("product")
+            if product:
+                for c in retrieve_codes(product, emb, meta, k):
+                    cc = str(c.get("code", ""))
+                    if cc not in codes:
+                        cands.append(c)
+                        codes[cc] = c
+                user2 = ("PRODUCT: " + item_text + f" (resolved: {product})" + what
+                         + "\n\nCANDIDATES:\n" + "\n".join(f'{c["code"]}: {c["description"]}' for c in cands))
+                try:
+                    parsed2 = extract_json(call_llm(system, user2, provider, model))
+                    pc = str(parsed2.get("code", ""))
+                    conf2 = _normalize_confidence(parsed2.get("confidence")) if pc in codes else 0.0
+                    if pc in codes and conf2 >= confidence:
+                        chosen, confidence, chosen_row = pc, conf2, codes.get(pc, {})
+                        resolver.learn(item_text, r.get("keywords", ""))
+                except Exception:
+                    pass
         # Honest back-off: low confidence → flag for human review + report the broader level we DO
         # trust (heading) instead of a confident-but-wrong 10-digit guess.
         needs_review = confidence < 0.5
