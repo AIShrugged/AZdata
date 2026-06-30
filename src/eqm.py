@@ -109,6 +109,9 @@ def expand_query(item_text: str, provider: Optional[str], model: Optional[str]) 
 
 _MACHINE_CHAPTERS = {"84", "85", "86", "87", "88", "89"}  # machinery/electrical/vehicles/ships/aircraft — never sold by the gram (ch.90 incl. medical syringes, so excluded)
 _WEIGHT_VOL_UNITS = {"q", "qr", "qram", "kq", "kg", "g", "gr", "l", "litr", "ml"}
+# Tier-2 adds latency (resolve + re-retrieve + re-rank). On by default; set AZDATA_TIER2=off to disable
+# globally (e.g. latency-sensitive batch) — Tier-1 still runs.
+_TIER2_DEFAULT = os.environ.get("AZDATA_TIER2", "on").strip().lower() in ("on", "1", "true", "yes")
 
 
 def _sanity_mismatch(item_text: str, code: str) -> bool:
@@ -127,11 +130,13 @@ def assign_code(
     provider: Optional[str] = None,
     model: Optional[str] = None,
     group: Optional[str] = None,
-    tier2: bool = True,
+    tier2: Optional[bool] = None,
     web: Optional[bool] = None,
 ) -> dict[str, Any]:
     provider = provider or DEFAULT_PROVIDER
     model = model or DEFAULT_MODELS.get(provider)
+    if tier2 is None:
+        tier2 = _TIER2_DEFAULT
     cands: list[dict[str, Any]] = []
     try:
         # Query expansion: describe the (possibly brand/colloquial) item in generic category terms
@@ -198,7 +203,8 @@ def assign_code(
                     conf2 = _normalize_confidence(parsed2.get("confidence")) if pc in codes else 0.0
                     if pc in codes and conf2 >= confidence:
                         chosen, confidence, chosen_row = pc, conf2, codes.get(pc, {})
-                        resolver.learn(item_text, r.get("keywords") or r.get("product", ""))
+                        if confidence >= 0.5 and not _sanity_mismatch(item_text, chosen):  # learn TRUSTED only
+                            resolver.learn(item_text, r.get("keywords") or r.get("product", ""), code=chosen)
                 except Exception:
                     pass
         # Honest back-off: low confidence OR a unit/chapter sanity violation → flag for human review

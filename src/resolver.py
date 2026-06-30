@@ -93,15 +93,15 @@ def resolve(item_text: str, provider: str, model: Optional[str], web: Optional[b
         return {"product": "", "keywords": "", "used_web": bool(facts), "error": str(exc)}
 
 
-def learn(term: str, keywords: str) -> None:
-    """Persist a resolved synonym so it can be folded into the index enrichment (re-embed) and
-    auto-resolve in Tier-1 next time. Local file — no external surface."""
+def learn(term: str, keywords: str, code: Optional[str] = None) -> None:
+    """Persist a TRUSTED resolution (term → keywords + the HS code it resolved to) so apply_learned.py
+    can fold the keywords into that code's index entry → auto-resolve in Tier-1 next time. Local file."""
     term = (term or "").strip()
     if not term or not keywords:
         return
     try:
         store = json.load(open(LEARNED, encoding="utf-8")) if LEARNED.exists() else {}
-        store[term.lower()] = keywords
+        store[term.lower()] = {"keywords": keywords, "code": str(code or "")}
         json.dump(store, open(LEARNED, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     except Exception:
         pass
