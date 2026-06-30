@@ -186,7 +186,7 @@ def assign_code(
                     conf2 = _normalize_confidence(parsed2.get("confidence")) if pc in codes else 0.0
                     if pc in codes and conf2 >= confidence:
                         chosen, confidence, chosen_row = pc, conf2, codes.get(pc, {})
-                        resolver.learn(item_text, r.get("keywords", ""))
+                        resolver.learn(item_text, r.get("keywords") or r.get("product", ""))
                 except Exception:
                     pass
         # Honest back-off: low confidence → flag for human review + report the broader level we DO

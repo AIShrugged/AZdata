@@ -24,6 +24,10 @@ else bad "bge-m3 missing — run: ollama pull bge-m3"; exit 1; fi
 
 if [ -s "$KEY" ]; then ok "OpenRouter key present"; export OPENROUTER_API_KEY="$(cat "$KEY")"
 else bad "OpenRouter key missing at $KEY"; exit 1; fi
+# Brave Search key (optional) — powers the Tier-2 web lookup when the user toggles it on.
+# Web stays OFF by default (privacy); the key only makes the web tier strong when enabled.
+BRAVE="$HOME/.config/azdata/brave.key"
+if [ -s "$BRAVE" ]; then ok "Brave key present (web lookup available when toggled on)"; export BRAVE_API_KEY="$(cat "$BRAVE")"; fi
 # demo: show SQL + detailed errors (production leaves this false)
 export AZDATA_DEBUG=true
 

@@ -37,20 +37,35 @@ def web_enabled(override: Optional[bool] = None) -> bool:
     return os.environ.get("AZDATA_WEB_SEARCH", "off").strip().lower() in ("on", "1", "true", "yes")
 
 
+def _brave_search(query: str, key: str) -> str:
+    url = "https://api.search.brave.com/res/v1/web/search?count=3&q=" + urllib.parse.quote(query)
+    req = urllib.request.Request(url, headers={"X-Subscription-Token": key, "Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=WEB_TIMEOUT) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+    results = ((data.get("web") or {}).get("results") or [])[:3]
+    parts = [(r.get("title", "") + ": " + (r.get("description", "") or "")).strip(" :") for r in results]
+    return " | ".join(p for p in parts if p)[:500]
+
+
+def _ddg_search(query: str) -> str:
+    url = "https://api.duckduckgo.com/?format=json&no_html=1&q=" + urllib.parse.quote(query)
+    with urllib.request.urlopen(url, timeout=WEB_TIMEOUT) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+    snippet = data.get("AbstractText") or data.get("Definition") or data.get("Heading") or ""
+    if not snippet:
+        for t in data.get("RelatedTopics", [])[:1]:
+            snippet = t.get("Text", "") if isinstance(t, dict) else ""
+    return str(snippet)[:400]
+
+
 def web_lookup(query: str, web: Optional[bool] = None) -> str:
-    """External web lookup — ONLY runs when web search is enabled. Best-effort, no-key (DuckDuckGo
-    instant-answer); returns a short factual snippet or '' (never raises)."""
+    """External web lookup — ONLY runs when web search is enabled (privacy). Uses Brave Search when
+    BRAVE_API_KEY is set, else a no-key DuckDuckGo fallback. Returns a short snippet or '' (never raises)."""
     if not web_enabled(web):
         return ""
+    key = os.environ.get("BRAVE_API_KEY")
     try:
-        url = "https://api.duckduckgo.com/?format=json&no_html=1&q=" + urllib.parse.quote(query)
-        with urllib.request.urlopen(url, timeout=WEB_TIMEOUT) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-        snippet = data.get("AbstractText") or data.get("Definition") or data.get("Heading") or ""
-        if not snippet:
-            for t in data.get("RelatedTopics", [])[:1]:
-                snippet = t.get("Text", "") if isinstance(t, dict) else ""
-        return str(snippet)[:400]
+        return _brave_search(query, key) if key else _ddg_search(query)
     except Exception:
         return ""
 
