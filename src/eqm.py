@@ -107,6 +107,18 @@ def expand_query(item_text: str, provider: Optional[str], model: Optional[str]) 
         return ""
 
 
+_MACHINE_CHAPTERS = {"84", "85", "86", "87", "88", "89"}  # machinery/electrical/vehicles/ships/aircraft — never sold by the gram (ch.90 incl. medical syringes, so excluded)
+_WEIGHT_VOL_UNITS = {"q", "qr", "qram", "kq", "kg", "g", "gr", "l", "litr", "ml"}
+
+
+def _sanity_mismatch(item_text: str, code: str) -> bool:
+    """A weight/volume-measured item (grams/kg/litres) that landed in a machinery/equipment chapter is
+    almost certainly wrong — used to trigger Tier-2 / flag review even when the model was overconfident."""
+    tokens = re.findall(r"[a-zəçşğıöü]+", item_text.lower())
+    weighed = any(u in tokens for u in _WEIGHT_VOL_UNITS)
+    return weighed and str(code)[:2] in _MACHINE_CHAPTERS
+
+
 def assign_code(
     item_text: str,
     emb: np.ndarray,
@@ -168,7 +180,7 @@ def assign_code(
         # TIER 2 (auto-resolve): if uncertain, resolve the brand/colloquial name to a generic product
         # (LLM knowledge; optional web lookup behind the privacy toggle) and re-retrieve + re-rank ONCE.
         # A successful resolution is LEARNED so the same pattern auto-resolves in Tier-1 next time.
-        if tier2 and confidence < 0.5:
+        if tier2 and (confidence < 0.5 or _sanity_mismatch(item_text, chosen)):
             import resolver
             r = resolver.resolve(item_text, provider, model, web=web)
             product = r.get("product")
@@ -189,9 +201,9 @@ def assign_code(
                         resolver.learn(item_text, r.get("keywords") or r.get("product", ""))
                 except Exception:
                     pass
-        # Honest back-off: low confidence → flag for human review + report the broader level we DO
-        # trust (heading) instead of a confident-but-wrong 10-digit guess.
-        needs_review = confidence < 0.5
+        # Honest back-off: low confidence OR a unit/chapter sanity violation → flag for human review
+        # + report the broader level we DO trust instead of a confident-but-wrong 10-digit guess.
+        needs_review = confidence < 0.5 or _sanity_mismatch(item_text, chosen)
         granularity = "code" if confidence >= 0.5 else ("heading" if confidence >= 0.3 else "chapter")
         return {"code": chosen, "description": _clean(chosen_row.get("description")),
                 "confidence": confidence, "code_substituted": not valid,
