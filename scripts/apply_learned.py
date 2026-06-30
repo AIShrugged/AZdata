@@ -52,6 +52,14 @@ def main() -> None:
     if a.rebuild:
         print("re-embedding the index …")
         subprocess.run([sys.executable, str(ROOT / "src/eqm.py"), "--build"], check=False)
+        # archive the folded entries so the active store resets (the threshold trigger counts new ones)
+        archive = P / "learned_synonyms.folded.json"
+        arch = json.load(open(archive, encoding="utf-8")) if archive.exists() else {}
+        arch.update(learned)
+        json.dump(arch, open(archive, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+        if LEARNED.exists():
+            LEARNED.unlink()
+        print(f"archived {len(learned)} entries → {archive.name}; active store reset")
     else:
         print("run `python src/eqm.py --build` (or pass --rebuild) to apply.")
 

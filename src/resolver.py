@@ -105,3 +105,13 @@ def learn(term: str, keywords: str, code: Optional[str] = None) -> None:
         json.dump(store, open(LEARNED, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     except Exception:
         pass
+
+
+def unfolded_count() -> int:
+    """How many learned (term→code) resolutions are waiting to be folded into the index.
+    Drives the threshold auto-trigger (no clock — fires while the app is running)."""
+    try:
+        store = json.load(open(LEARNED, encoding="utf-8")) if LEARNED.exists() else {}
+        return sum(1 for v in store.values() if isinstance(v, dict) and v.get("code"))
+    except Exception:
+        return 0

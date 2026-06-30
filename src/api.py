@@ -4,6 +4,7 @@ from collections import OrderedDict
 import json
 import logging
 import os
+import subprocess
 import sys
 import threading
 import time
@@ -39,6 +40,9 @@ _cache_lock = threading.Lock()
 _rate_state: "dict[str, list]" = {}
 _rate_lock = threading.Lock()
 _index_lock = threading.Lock()
+LEARN_THRESHOLD = int(os.environ.get("AZDATA_LEARN_THRESHOLD", "20"))  # fold + re-embed after this many new learned terms
+_rebuild_lock = threading.Lock()
+_rebuild_state = {"on": False}
 
 
 def _cache_get(cache, key):
@@ -118,6 +122,34 @@ def _apply_correction_to_index(correction: Optional[dict]) -> None:
             RAG_META = RAG_META + [meta_row]
     except Exception as exc:
         log.warning("correction index append failed: %s", exc)
+
+
+def _apply_learned_bg() -> None:
+    """Background: fold learned synonyms + re-embed the EQM index, then hot-reload it in place."""
+    global EQM_EMB, EQM_META
+    try:
+        subprocess.run([sys.executable, str(ROOT / "scripts/apply_learned.py"), "--rebuild"], check=False, timeout=3600)
+        emb, meta = eqm.load_eqm_index()
+        with _index_lock:
+            EQM_EMB, EQM_META = emb, meta
+        log.info("apply_learned: re-embedded + hot-reloaded EQM index (%d codes)", len(meta))
+    except Exception as exc:
+        log.warning("apply_learned background job failed: %s", exc)
+    finally:
+        _rebuild_state["on"] = False
+
+
+def _maybe_apply_learned() -> None:
+    """Threshold trigger (no clock): when enough new terms are learned, fold + re-embed in the
+    background WHILE the app is running. Cheap check — safe to call after each classify."""
+    if _rebuild_state["on"] or resolver.unfolded_count() < LEARN_THRESHOLD:
+        return
+    with _rebuild_lock:
+        if _rebuild_state["on"]:
+            return
+        _rebuild_state["on"] = True
+    log.info("apply_learned: threshold (%d) reached — re-embedding in background", LEARN_THRESHOLD)
+    threading.Thread(target=_apply_learned_bg, daemon=True).start()
 
 
 app = FastAPI(title="AZdata e-invoice AI", version="0.2.0")
@@ -270,6 +302,7 @@ def classify(request: Request, req: ClassifyRequest) -> Any:
                 log.warning("review enqueue failed: %s", exc)
         if result.get("label") is not None and not result.get("error"):
             _cache_put(_classify_cache, key, result)  # cache real successes only — never a failure/null
+        _maybe_apply_learned()  # threshold trigger: re-embed in bg once enough terms are learned
         ms = int((time.time() - start) * 1000)
         log.info("classify text=%r latency_ms=%d cache=%s tier=%s escalated=%s", req.text[:60], ms, "miss", result.get("tier"), result.get("escalated"))
         if result.get("error"):
@@ -300,10 +333,29 @@ def review_resolve(request: Request, req: ReviewResolveRequest) -> Any:
     return out
 
 
+@app.post("/review/apply-learned")
+def review_apply_learned(request: Request) -> Any:
+    """Manually fold learned synonyms into the index + re-embed (background). The 'if needed it can
+    be ran' button — complements the automatic threshold trigger."""
+    _check_request(request)
+    pending = resolver.unfolded_count()
+    if pending == 0:
+        return {"status": "nothing to fold", "pending": 0}
+    if _rebuild_state["on"]:
+        return {"status": "already running", "pending": pending}
+    with _rebuild_lock:
+        _rebuild_state["on"] = True
+    threading.Thread(target=_apply_learned_bg, daemon=True).start()
+    return {"status": "started — re-embedding in background", "pending": pending}
+
+
 @app.get("/review/stats")
 def review_stats(request: Request) -> Any:
     _check_request(request)
-    return review.stats()
+    stats = review.stats()
+    stats["learned_pending"] = resolver.unfolded_count()
+    stats["index_rebuilding"] = _rebuild_state["on"]
+    return stats
 
 
 @app.get("/evals")
