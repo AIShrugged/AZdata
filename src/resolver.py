@@ -107,11 +107,34 @@ def learn(term: str, keywords: str, code: Optional[str] = None) -> None:
         pass
 
 
+def _load_store() -> dict[str, Any]:
+    try:
+        return json.load(open(LEARNED, encoding="utf-8")) if LEARNED.exists() else {}
+    except Exception:
+        return {}
+
+
 def unfolded_count() -> int:
     """How many learned (term→code) resolutions are waiting to be folded into the index.
     Drives the threshold auto-trigger (no clock — fires while the app is running)."""
-    try:
-        store = json.load(open(LEARNED, encoding="utf-8")) if LEARNED.exists() else {}
-        return sum(1 for v in store.values() if isinstance(v, dict) and v.get("code"))
-    except Exception:
-        return 0
+    return sum(1 for v in _load_store().values() if isinstance(v, dict) and v.get("code"))
+
+
+def list_learned() -> list[dict[str, Any]]:
+    """The pending learned resolutions — for human review BEFORE they are folded into the index."""
+    return [{"term": term, "keywords": info.get("keywords", ""), "code": info.get("code", "")}
+            for term, info in _load_store().items() if isinstance(info, dict)]
+
+
+def forget(term: str) -> bool:
+    """Reject a learned resolution before it is applied (e.g. a wrong auto-resolution)."""
+    term = (term or "").strip().lower()
+    store = _load_store()
+    if term in store:
+        del store[term]
+        try:
+            json.dump(store, open(LEARNED, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+            return True
+        except Exception:
+            pass
+    return False

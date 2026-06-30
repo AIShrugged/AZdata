@@ -91,6 +91,10 @@
     .correct-form{display:grid;grid-template-columns:120px minmax(180px,1fr) auto;gap:8px;margin-top:10px}
     .correct-form[hidden]{display:none}.correct-form select,.correct-form button{min-height:36px}
     .flash{margin-bottom:14px;border:1px solid #abefc6;border-radius:8px;background:var(--green-bg);color:var(--green);padding:10px 12px;font-weight:700}
+    .learned-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}
+    .learned-head .review-actions{align-items:center;justify-content:flex-end}
+    .learned-term{font-weight:760}.learned-desc{max-width:360px}
+    .learned-status{color:var(--green);font-weight:700}
     .section{border-top:1px solid var(--line);padding-top:18px;margin-top:18px}
     .section:first-of-type{border-top:0;padding-top:0;margin-top:0}
     h2,h3{margin:0;letter-spacing:0}h2{font-size:22px;line-height:1.25}h3{font-size:16px;margin-bottom:10px}
@@ -112,6 +116,7 @@
       form,#classify-form{grid-template-columns:1fr}button{width:100%}
       .eval-head{align-items:stretch;flex-direction:column}.confusion{grid-template-columns:1fr}.truncate{max-width:260px}
       .correct-form{grid-template-columns:1fr}.review-actions{display:grid}
+      .learned-head{display:grid}.learned-desc{max-width:260px}
       .chip,.copy-sql{width:auto}.pre-head{align-items:flex-start;flex-direction:column}
     }
   </style>
@@ -194,7 +199,7 @@
   <script>
     const $=id=>document.getElementById(id);
     const statusEl=$("status"),queryOutput=$("query-output"),classifyOutput=$("classify-output"),evalsOutput=$("evals-output"),reviewOutput=$("review-output"),webSearchToggle=$("web-search-toggle");
-    let evalsLoaded=false,reviewFlash="";
+    let evalsLoaded=false,reviewFlash="",learnedFlash="";
 
     function escapeHTML(value){
       return String(value==null?"":value).replace(/&/g,"&amp;").replace(/</g,"&lt;")
@@ -346,8 +351,10 @@
     function renderReviewStats(stats){
       const s=stats||{},override=Number(s.override_rate),rate=Number.isFinite(override)?(override<=1?override*100:override):0;
       const reasons=Object.entries(s.by_reason||{}).map(([reason,count])=>`<span class="tag ${reasonClass(reason)}">${escapeHTML(reason)}: ${escapeHTML(count)}</span>`).join("");
+      const rebuilding=s.index_rebuilding===true?`<span class="tag local">re-embedding</span>`:"";
       return `<div class="review-stats">
-        <strong>Pending: ${escapeHTML(s.pending??0)} · Reviewed: ${escapeHTML(s.reviewed??0)} · Override rate: ${escapeHTML(rate.toFixed(1))}% · Corrections fed back: ${escapeHTML(s.corrections_captured??0)}</strong>
+        <strong>Pending: ${escapeHTML(s.pending??0)} · Reviewed: ${escapeHTML(s.reviewed??0)} · Override rate: ${escapeHTML(rate.toFixed(1))}% · Corrections fed back: ${escapeHTML(s.corrections_captured??0)} · Learned pending: ${escapeHTML(s.learned_pending??0)}</strong>
+        ${rebuilding}
         ${reasons}
       </div>`;
     }
@@ -385,12 +392,49 @@
       }).join("");
       return `<div class="table-wrap"><table><thead><tr><th>Item</th><th>Reason</th><th>Model prediction</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     }
+    function renderLearnedItems(items){
+      if(!Array.isArray(items)||!items.length)return `<div class="empty">Nothing learned yet.</div>`;
+      const rows=items.map(item=>`
+        <tr>
+          <td><span class="learned-term">${escapeHTML(item.term)}</span></td>
+          <td>${escapeHTML(item.code)}</td>
+          <td><div class="truncate learned-desc" title="${escapeHTML(item.description)}">${escapeHTML(item.description)}</div></td>
+          <td>
+            <div class="review-actions">
+              <button class="ghost" type="button" data-learned-action="forget" data-term="${escapeHTML(item.term)}">✕ reject</button>
+            </div>
+          </td>
+        </tr>`).join("");
+      return `<div class="table-wrap"><table><thead><tr><th>Term</th><th>Code</th><th>Description</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }
+    function renderLearnedPanel(learned,stats){
+      const pending=Number(learned&&learned.pending);
+      const count=Number.isFinite(pending)?pending:Array.isArray(learned&&learned.items)?learned.items.length:0;
+      const rebuilding=stats&&stats.index_rebuilding===true;
+      const status=learnedFlash?`<span class="learned-status">${escapeHTML(learnedFlash)}</span>`:"";
+      return `<section class="section">
+        <div class="learned-head">
+          <div>
+            <h3>Learned terms (pending re-embed)</h3>
+            <p class="muted small">Applying re-embeds the index (~20 min, runs in the background).</p>
+          </div>
+          <div class="review-actions">
+            ${rebuilding?`<span class="muted small">⏳ re-embedding...</span>`:""}
+            ${status}
+            <button class="ghost" type="button" data-learned-action="apply" ${rebuilding||count===0?"disabled":""}>Apply learned (${escapeHTML(count)})</button>
+          </div>
+        </div>
+        ${renderLearnedItems(learned&&learned.items)}
+      </section>`;
+    }
     function renderReview(data){
       reviewOutput.innerHTML=`
         ${reviewFlash?`<div class="flash">${escapeHTML(reviewFlash)}</div>`:""}
         ${renderReviewStats(data.stats)}
-        ${renderReviewItems(data.items)}`;
+        ${renderReviewItems(data.items)}
+        ${renderLearnedPanel(data.learned,data.stats)}`;
       reviewFlash="";
+      learnedFlash="";
     }
     async function loadHealth(){
       try{
@@ -410,7 +454,14 @@
     async function loadReview(button){
       reviewOutput.innerHTML=`<div class="empty">Loading review queue...</div>`;
       const work=async()=>{
-        try{renderReview(await getJSON("/review/queue?status=pending"))}
+        try{
+          const [queue,learned,stats]=await Promise.all([
+            getJSON("/review/queue?status=pending"),
+            getJSON("/review/learned"),
+            getJSON("/review/stats")
+          ]);
+          renderReview({items:queue.items,stats:{...(queue.stats||{}),...(stats||{})},learned});
+        }
         catch(err){showError(reviewOutput,err)}
       };
       return button?withButton(button,"…",work):work();
@@ -420,6 +471,23 @@
         try{
           const data=await postJSON("/review/resolve",body);
           reviewFlash=data.index_updated?"✓ saved — index updated":"✓ saved";
+          await loadReview();
+        }catch(err){showError(reviewOutput,err)}
+      });
+    }
+    async function rejectLearned(button,term){
+      await withButton(button,"…",async()=>{
+        try{
+          await postJSON("/review/forget",{term});
+          await loadReview();
+        }catch(err){showError(reviewOutput,err)}
+      });
+    }
+    async function applyLearned(button){
+      await withButton(button,"…",async()=>{
+        try{
+          const data=await postJSON("/review/apply-learned",{});
+          learnedFlash=data.status||"re-embedding in background";
           await loadReview();
         }catch(err){showError(reviewOutput,err)}
       });
@@ -458,6 +526,13 @@
     $("evals-refresh").addEventListener("click",event=>loadEvals(event.currentTarget));
     $("review-refresh").addEventListener("click",event=>loadReview(event.currentTarget));
     $("review-output").addEventListener("click",event=>{
+      const learnedButton=event.target.closest("[data-learned-action]");
+      if(learnedButton){
+        const action=learnedButton.dataset.learnedAction;
+        if(action==="forget")rejectLearned(learnedButton,learnedButton.dataset.term);
+        if(action==="apply")applyLearned(learnedButton);
+        return;
+      }
       const button=event.target.closest("[data-review-action]");
       if(!button)return;
       const id=button.dataset.id,action=button.dataset.reviewAction;

@@ -142,8 +142,8 @@ def _apply_learned_bg() -> None:
 def _maybe_apply_learned() -> None:
     """Threshold trigger (no clock): when enough new terms are learned, fold + re-embed in the
     background WHILE the app is running. Cheap check — safe to call after each classify."""
-    if _rebuild_state["on"] or resolver.unfolded_count() < LEARN_THRESHOLD:
-        return
+    if LEARN_THRESHOLD <= 0 or _rebuild_state["on"] or resolver.unfolded_count() < LEARN_THRESHOLD:
+        return  # AZDATA_LEARN_THRESHOLD=0 → manual-only: nothing auto-applies, you review then click Apply
     with _rebuild_lock:
         if _rebuild_state["on"]:
             return
@@ -203,6 +203,10 @@ class ReviewResolveRequest(BaseModel):
     corrected_label: Optional[str] = None
     corrected_group: Optional[str] = None
     reviewer: Optional[str] = None
+
+
+class ForgetRequest(BaseModel):
+    term: str
 
 
 @app.get("/health")
@@ -347,6 +351,25 @@ def review_apply_learned(request: Request) -> Any:
         _rebuild_state["on"] = True
     threading.Thread(target=_apply_learned_bg, daemon=True).start()
     return {"status": "started — re-embedding in background", "pending": pending}
+
+
+@app.get("/review/learned")
+def review_learned(request: Request) -> Any:
+    """Inspect what the engine auto-learned, BEFORE it is folded into the index. Each entry shows the
+    term, the HS code it resolved to, and that code's description so you can judge correctness."""
+    _check_request(request)
+    desc = {str(c.get("code")): c.get("description") for c in (EQM_META or [])}
+    items = resolver.list_learned()
+    for it in items:
+        it["description"] = desc.get(it["code"], "")
+    return {"items": items, "pending": len(items)}
+
+
+@app.post("/review/forget")
+def review_forget(request: Request, req: ForgetRequest) -> Any:
+    """Reject a learned resolution (e.g. a wrong one) before it is applied."""
+    _check_request(request)
+    return {"forgotten": resolver.forget(req.term), "pending": resolver.unfolded_count()}
 
 
 @app.get("/review/stats")
